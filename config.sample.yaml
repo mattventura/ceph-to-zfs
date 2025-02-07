@@ -1,0 +1,20 @@
+clusters:
+
+  myCluster:
+    authName: 'client.admin'
+    confFile: '/etc/ceph/ceph.conf'
+    clusterName: 'ceph'
+
+jobs:
+  - name: 'Backup VM Images'
+    cluster: 'myCluster'
+    cephPoolName: 'vm-images'
+    # tank/backups must already exist. 'volmode' on this dataset must be 'dev' (recommended - avoids dev nodes for
+    # zvol partitions) or 'full'. 'full' is typically the default.
+    zfsDestination: 'tank/backups/vm-images'
+    # Regex applied to image names. Both of these are optional.
+    # If both are specified, image names must match `imageIncludeRegex` and not match `imageExcludeRegex`
+    # If only `imageIncludeRegex` is specified, then only matching images will be included.
+    # If only `imageExcludeRegex` is specified, then all images except those matching the pattern will be included.
+    imageExcludeRegex: 'vm-swap-.*'
+    imageIncludeRegex: 'vm-data-.*'
