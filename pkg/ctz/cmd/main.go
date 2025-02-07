@@ -45,7 +45,12 @@ func main() {
 			fmt.Printf("Task failed: %v\n", err)
 			os.Exit(1)
 		} else {
-			fmt.Println("Task completed successfully")
+			if task.StatusLog().Status().Type().IsBad() {
+				os.Exit(1)
+			} else {
+				fmt.Println("Task completed successfully")
+				os.Exit(0)
+			}
 		}
 	} else if !*webEnable {
 		fmt.Println("Neither oneshot mode nor web interface enabled, nothing to do")

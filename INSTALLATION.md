@@ -1,6 +1,71 @@
-# Host Setup
+# Host Setup (Debian-Based)
+
+Prerequisites:
+- Golang >= 1.22
 
 ```shell
+# You need the header files for librados and librbd
 # (as root/sudo)
-apt install librados-dev librbd-dev
+apt install librados-dev librbd-dev 
+# Clone and build the app (normal user)
+git clone https://github.com/mattventura/ceph-to-zfs.git
+cd ceph-to-zfs
+go build -o ./ctz ./pkg/ctz/cmd
+# Check that it built correctly
+./ctz --help
 ```
+
+# ZFS Configuration
+
+You will need to ensure that the user you wish to run CTZ as has adequate permissions to the parent dataset that you
+plan to use for backups.
+
+```shell
+# TODO check if there are any others that are needed
+zfs allow backupuser create,mount,rollback,snapshot tank/ceph-backups
+```
+
+# CTZ Configuration
+
+Copy the included `config.sample.yaml` to `config.yaml` and edit accordingly.
+
+First, define one or more Ceph clusters to connect to in the `clusters` section. If you are already using Ceph on the
+host system, it is still recommended that you create a separate Ceph user with the minimum required privilege on the
+cluster, and use that for CTZ.
+
+Then, configure your backup jobs. Each backup job copies RBD image(s) from the cluster to ZFS. 
+The `cluster` property refers to the name you gave your cluster in the `clusters` section (`myCluster` in the
+example). 
+`zfsDestination` acts as the parent ZFS dataset for the images.
+Volumes are created under that dataset, with the same name as they have in Ceph. In the example,
+the `zfsDestination` is `tank/backups/vm-images`, so an image by the name of `vm-disk-1` would become
+`tank/backups/vm-images/vm-disk-1`. 
+If `imageIncludeRegex` is specified, only matching images are included. Otherwise, all images are included by default.
+If `imageExcludeRegex` is specified, images matching that will be excluded. Exclusion has higher priority over
+inclusion.
+
+# Running
+
+The two most common modes of operation are "oneshot" and "web".
+
+## Oneshot
+
+Oneshot mode executes all jobs and then exits.
+```shell
+./ctz -oneshot
+```
+Non-zero exit codes indicate that one or more jobs failed.
+
+## Web
+
+To use the web interface, specify the -web flag, and optionally the -webport flag.
+```shell
+./ctz -web -webport 8888
+```
+It will not do anything by default. However, it exposes a few endpoints on the specified port:
+
+- `GET /api/alltasks` - display the status of all tasks. Will not have much info until tasks are started or at least prepped.
+- `GET /api/prepall` - prep all tasks, but do not run them. Useful for seeing what images CTZ would process.
+- `GET /api/startall` - start running all tasks.
+
+After calling `prepall` or `startall`, check `alltasks` and/or the console output to monitor progress.

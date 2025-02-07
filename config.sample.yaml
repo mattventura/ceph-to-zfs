@@ -16,5 +16,5 @@ jobs:
     # If both are specified, image names must match `imageIncludeRegex` and not match `imageExcludeRegex`
     # If only `imageIncludeRegex` is specified, then only matching images will be included.
     # If only `imageExcludeRegex` is specified, then all images except those matching the pattern will be included.
-    imageExcludeRegex: 'vm-swap-.*'
-    imageIncludeRegex: 'vm-data-.*'
+    imageExcludeRegex: 'vm-disk-swap.*'
+    imageIncludeRegex: 'vm-disk-.*'

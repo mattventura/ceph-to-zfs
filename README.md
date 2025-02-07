@@ -1,3 +1,12 @@
+## Important Info
+
+Currently, the project only covers CephFS and has a limited set of features. It was recently rewritten from
+Python to Go for better performance and parallelism.
+
+### Installation
+
+See [INSTALLATION.md](./INSTALLATION.md)
+
 # Backup CephFS + RBD to ZFS
 
 I love ZFS. One of the things I love about it is how easy it is to have high-quality backups of all of your ZFS data.
@@ -22,7 +31,7 @@ The basic workflow for RBD backup is:
 4. Write the blocks to the target zvol device.
 5. Snapshot the target zvol, with a name matching the RBD snapshot.
 
-For CephFS:
+For CephFS (still WIP):
 
 1. Look at the timestamp of the latest snapshot on the target ZFS filesystem.
 2. Using the `rctime` attribute, identify changed files.
@@ -34,7 +43,7 @@ For CephFS:
 
 This project aims to, in the long term, become an improvement over the alternatives in these areas:
 
-- Covers both CephFS and RBD (potentially RGW in the future).
+- Will eventually voer both CephFS and RBD (potentially RGW in the future).
 - Allows the use of native ZFS features such as encryption and deduplication.
 - In addition, use of ZFS means you would be able to easily mount and access old snapshots, without having to restore.
 
