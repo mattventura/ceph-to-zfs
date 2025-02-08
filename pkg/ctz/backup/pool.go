@@ -28,7 +28,7 @@ func NewPoolBackupTask(
 	jobConfig *config.PoolJobProcessedConfig,
 	parentLog *logging.JobStatusLogger,
 ) *PoolBackupTask {
-	log := parentLog.MakeOrReplaceChild(logging.LoggerKey(jobConfig.Name), false)
+	log := parentLog.MakeOrReplaceChild(logging.LoggerKey(jobConfig.Label), false)
 	out := &PoolBackupTask{
 		cephConfig: jobConfig.ClusterConfig,
 		jobConfig:  jobConfig,
@@ -175,8 +175,12 @@ func (t *PoolBackupTask) Prepare() (err error) {
 	return t.mt.Prepare()
 }
 
-func (t *PoolBackupTask) Name() string {
-	return t.jobConfig.Name
+func (t *PoolBackupTask) Id() string {
+	return t.jobConfig.Id
+}
+
+func (t *PoolBackupTask) Label() string {
+	return t.jobConfig.Label
 }
 
 var _ task.PreparableTask = &PoolBackupTask{}

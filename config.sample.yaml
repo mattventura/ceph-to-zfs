@@ -6,8 +6,13 @@ clusters:
     clusterName: 'ceph'
 
 jobs:
-  - name: 'Backup VM Images'
+  - # Only alphanumeric, hyphen, underscore
+  - id: Backup_VMs
+    # Human readable label. Optional, uses the ID if not specified.
+    label: 'Backup VM Images'
+    # Refers to a key in the "clusters" top-level object
     cluster: 'myCluster'
+    # Ceph pool name
     cephPoolName: 'vm-images'
     # tank/backups must already exist. 'volmode' on this dataset must be 'dev' (recommended - avoids dev nodes for
     # zvol partitions) or 'full'. 'full' is typically the default.

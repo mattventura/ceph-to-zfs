@@ -30,7 +30,8 @@ var DefaultClusterConfig = &CephClusterConfig{
 }
 
 type PoolJobRawConfig struct {
-	Name              string `yaml:"name" binding:"required"`
+	Id                string `yaml:"id" binding:"required"`
+	Label             string `yaml:"label" binding:"required"`
 	Cluster           string `yaml:"cluster" binding:"required"`
 	CephPoolName      string `yaml:"cephPoolName" binding:"required"`
 	ZfsDestination    string `yaml:"zfsDestination" binding:"required"`
@@ -39,13 +40,16 @@ type PoolJobRawConfig struct {
 }
 
 type PoolJobProcessedConfig struct {
-	Name              string
+	Id                string
+	Label             string
 	ClusterConfig     *CephClusterConfig
 	CephPoolName      string
 	ZfsDestination    string
 	ImageIncludeRegex *regexp.Regexp
 	ImageExcludeRegex *regexp.Regexp
 }
+
+var idPattern = regexp.MustCompile("^[a-zA-Z0-9._-]+$")
 
 func FromYamlFile(filepath string) (*TopLevelProcessedConfig, error) {
 	var rawConfig TopLevelRawConfig
@@ -71,9 +75,18 @@ func FromYamlFile(filepath string) (*TopLevelProcessedConfig, error) {
 	var jobs []*PoolJobProcessedConfig
 	for i, rawJob := range rawConfig.Jobs {
 		clusterKey := rawJob.Cluster
+		if rawJob.Id == "" {
+			return nil, errors.New(fmt.Sprintf("job id must be specified (job #%v)", i))
+		}
+		if !idPattern.MatchString(rawJob.Id) {
+			return nil, errors.New("job id must contain only alphanumeric, hyphen, underscores: '" + rawJob.Id + "'")
+		}
+		if rawJob.Label == "" {
+			rawJob.Label = rawJob.Id
+		}
 		clusterConfig := rawConfig.Clusters[clusterKey]
 		if clusterConfig == nil {
-			return nil, errors.New(fmt.Sprintf("Job '%v' wants cluster '%v', but there is no configured cluster of that name", rawJob.Name, clusterKey))
+			return nil, errors.New(fmt.Sprintf("Job '%v' wants cluster '%v', but there is no configured cluster of that name", rawJob.Label, clusterKey))
 		}
 		var include *regexp.Regexp
 		if rawJob.ImageIncludeRegex != "" {
@@ -93,13 +106,14 @@ func FromYamlFile(filepath string) (*TopLevelProcessedConfig, error) {
 			return nil, errors.New(fmt.Sprintf("name is missing in job config '%v'", i))
 		}
 		if rawJob.CephPoolName == "" {
-			return nil, errors.New(fmt.Sprintf("cephPoolName is missing in job config '%v'", rawJob.Name))
+			return nil, errors.New(fmt.Sprintf("cephPoolName is missing in job config '%v'", rawJob.Label))
 		}
 		if rawJob.ZfsDestination == "" {
-			return nil, errors.New(fmt.Sprintf("zfsDestination is missing in job config '%v'", rawJob.Name))
+			return nil, errors.New(fmt.Sprintf("zfsDestination is missing in job config '%v'", rawJob.Label))
 		}
 		job := &PoolJobProcessedConfig{
-			Name:              rawJob.Name,
+			Id:                rawJob.Id,
+			Label:             rawJob.Label,
 			ClusterConfig:     clusterConfig,
 			CephPoolName:      rawJob.CephPoolName,
 			ZfsDestination:    rawJob.ZfsDestination,

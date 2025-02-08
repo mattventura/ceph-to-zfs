@@ -19,15 +19,17 @@ func StartWebInterface(topLevel task.PreparableTask, port int) error {
 	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
 		Formatter: func(params gin.LogFormatterParams) string {
 			if params.ErrorMessage == "" {
-				return fmt.Sprintf("(%v) %v %#v", params.ClientIP, params.Method, params.Path)
+				return fmt.Sprintf("(%v) %v %v %#v", params.ClientIP, params.StatusCode, params.Method, params.Path)
 			} else {
-				return fmt.Sprintf("(%v) %v %#v\n%v", params.ClientIP, params.Method, params.Path, params.ErrorMessage)
+				return fmt.Sprintf("(%v) %v %v %#v\n%v", params.ClientIP, params.StatusCode, params.Method, params.Path, params.ErrorMessage)
 			}
 		},
 		Output: log.AsWriter(),
 	}))
 	r.Use(gin.Recovery())
-
+	r.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	})
 	r.GET("/api/alltasks", func(c *gin.Context) {
 		c.JSON(http.StatusOK, ToTaskView(topLevel))
 	})
@@ -56,7 +58,8 @@ func StartWebInterface(topLevel task.PreparableTask, port int) error {
 }
 
 type TaskView struct {
-	Name     string     `json:"name"`
+	Id       string     `json:"id"`
+	Label    string     `json:"label"`
 	Status   StatusView `json:"status"`
 	Children []TaskView `json:"children"`
 }
@@ -65,7 +68,8 @@ func ToTaskView(t task.Task) TaskView {
 	s := t.StatusLog().Status()
 	st := s.Type()
 	return TaskView{
-		Name: t.Name(),
+		Id:    t.Id(),
+		Label: t.Label(),
 		Status: StatusView{
 			Type:       st.Label(),
 			Message:    s.Msg(),
@@ -77,8 +81,8 @@ func ToTaskView(t task.Task) TaskView {
 }
 
 type StatusView struct {
-	Type       string
-	Message    string
-	IsBad      bool
-	IsTerminal bool
+	Type       string `json:"type"`
+	Message    string `json:"message"`
+	IsBad      bool   `json:"isBad"`
+	IsTerminal bool   `json:"isTerminal"`
 }

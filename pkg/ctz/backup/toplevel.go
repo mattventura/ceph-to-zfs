@@ -41,10 +41,10 @@ func (t *TopLevelTask) Children() []task.Task {
 func (t *TopLevelTask) prep() error {
 	var children []*PoolBackupTask
 	for _, jobCfg := range t.cfg.Jobs {
-		child := t.childMap[jobCfg.Name]
+		child := t.childMap[jobCfg.Label]
 		if child == nil {
 			child = NewPoolBackupTask(jobCfg, t.log)
-			t.childMap[jobCfg.Name] = child
+			t.childMap[jobCfg.Label] = child
 		}
 		children = append(children, child)
 	}
@@ -69,8 +69,12 @@ func (t *TopLevelTask) Prepare() error {
 	return t.mt.Prepare()
 }
 
-func (t *TopLevelTask) Name() string {
+func (t *TopLevelTask) Label() string {
 	return "Root"
+}
+
+func (t *TopLevelTask) Id() string {
+	return "root"
 }
 
 var _ task.Task = &TopLevelTask{}

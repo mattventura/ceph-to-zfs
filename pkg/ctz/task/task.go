@@ -9,7 +9,8 @@ import (
 )
 
 type Task interface {
-	Name() string
+	Id() string
+	Label() string
 	Run() error
 	Children() []Task
 	StatusLog() *logging.JobStatusLogger

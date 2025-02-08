@@ -54,7 +54,12 @@ func (t *ImageBackupTask) Children() []task.Task {
 	return nil
 }
 
-func (t *ImageBackupTask) Name() string {
+func (t *ImageBackupTask) Label() string {
+	return t.imageName
+}
+
+func (t *ImageBackupTask) Id() string {
+	// TODO: I can't find a concrete source for what characters are allowed in an RBD image name
 	return t.imageName
 }
 
@@ -124,7 +129,7 @@ func (t *ImageBackupTask) Run() (err error) {
 	t.log.Log("Preparing ZFS")
 	zplog := t.log.MakeOrReplaceChild("Find/Create Dataset", true)
 	// TODO: this isn't very much a "prep" step
-	zv, err := t.zfsContext.PrepareChild(t.Name(), size, blockSize, zplog)
+	zv, err := t.zfsContext.PrepareChild(t.Label(), size, blockSize, zplog)
 	if err != nil {
 		zplog.SetStatusByError(err)
 		return err
