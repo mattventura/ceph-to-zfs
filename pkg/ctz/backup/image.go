@@ -16,7 +16,6 @@ import (
 	"os"
 	"runtime"
 	"slices"
-	"sync"
 	"time"
 	"unsafe"
 )
@@ -29,19 +28,28 @@ type ImageBackupTask struct {
 	ioctx      *rados.IOContext
 	zfsContext *zfssupport.ZfsContext
 	log        *logging.JobStatusLogger
-	mut        *sync.Mutex
+	mt         *task.ManagedTask
+	finalData  *finalData
+}
+
+type finalData struct {
+	zfsSnapshotName string
+	bytesWritten    uint64
+	bytesTrimmed    uint64
 }
 
 func NewImageBackupTask(imageName string, cephConfig *config.CephClusterConfig, poolname string, zfsContext *zfssupport.ZfsContext, parentLog *logging.JobStatusLogger) *ImageBackupTask {
-	return &ImageBackupTask{
+	log := parentLog.MakeOrReplaceChild(logging.LoggerKey(imageName), true)
+	out := &ImageBackupTask{
 		imageName: imageName,
 		//ioctx:      ioctx,
 		cephConfig: cephConfig,
 		poolName:   poolname,
 		zfsContext: zfsContext,
-		log:        parentLog.MakeOrReplaceChild(logging.LoggerKey(imageName), true),
-		mut:        &sync.Mutex{},
+		log:        log,
 	}
+	out.mt = task.NewManagedTask(log, out.reset, out.run)
+	return out
 }
 
 func (t *ImageBackupTask) StatusLog() *logging.JobStatusLogger {
@@ -63,15 +71,29 @@ func (t *ImageBackupTask) Id() string {
 	return t.imageName
 }
 
-func (t *ImageBackupTask) Run() (err error) {
+func (t *ImageBackupTask) Run() error {
+	// Format the success message with the final results
+	return t.mt.Run(func() string {
+		fd := t.finalData
+		if fd == nil {
+			return "FAIL: task did not report data"
+		} else {
+			return fmt.Sprintf("Wrote %v bytes (trimmed %v) and created snapshot '%v'", fd.bytesWritten, fd.bytesTrimmed, fd.zfsSnapshotName)
+		}
+	})
+}
+
+func (t *ImageBackupTask) reset() error {
+	t.finalData = nil
+	return nil
+}
+
+func (t *ImageBackupTask) run() error {
 	var bytesWritten uint64
 	var bytesTrimmed uint64
-	// lock
-	locked := t.mut.TryLock()
-	if !locked {
-		return errors.New("ImageBackupTask already in progress")
-	}
-	defer t.mut.Unlock()
+
+	// Snapshot name convention: ctz-YYYY-MM-dd-HH:mm:ss
+	// TODO make this configurable
 	snapName := "ctz-" + time.Now().Format("2006-01-02-15:04:05")
 
 	t.log.SetStatus(status.SimpleStatus(status.Preparing))
@@ -82,66 +104,59 @@ func (t *ImageBackupTask) Run() (err error) {
 	t.log.Log("Getting ceph image")
 	conn, err := cephsupport.Connect(t.cephConfig)
 	if err != nil {
-		return err
+		return util.Wrap("failed to connect to ceph cluster", err)
 	}
 	defer func() { go conn.Shutdown() }()
-	t.log.SetStatus(status.MakeStatus(status.Preparing, "Enumerating Images"))
+	t.log.SetStatus(status.MakeStatus(status.Preparing, "Opening IOContext"))
 	context, err := conn.OpenIOContext(t.poolName)
 	if err != nil {
-		return err
+		return util.Wrap("error opening IOContext", err)
 	}
 	img, err := rbd.OpenImage(context, t.imageName, "")
 	if err != nil {
-		return err
+		return util.Wrap("error opening image", err)
 	}
 	defer img.Close()
 	cephImage := cephsupport.NewCephImageView(img)
 
-	// Snapshot name convention: ctz-YYYY-MM-dd-HH:mm:ss
-	// TODO make this configurable
-	t.log.Log("Creating snapshot %v", snapName)
-
-	defer func() {
-		if err != nil {
-			t.log.SetStatusByError(err)
-		} else {
-			_ = t.log.SetFinished(fmt.Sprintf("Wrote %v bytes (trimmed %v) and created snapshot '%v'", bytesWritten, bytesTrimmed, snapName))
-		}
-	}()
+	t.log.SetStatus(status.MakeStatus(status.Preparing, fmt.Sprintf("Creating RBD snapshot %v", snapName)))
 
 	// Get image size to ensure that the receiver is large enough
 	size, err := cephImage.Size()
 	if err != nil {
-		return err
+		return util.Wrap("error getting ceph image size", err)
 	}
 	t.log.Log("Ceph image size: %v", size)
 	// Snapshot the ceph pool
 	err = cephImage.SnapAndActivate(snapName)
 	if err != nil {
-		return err
+		return util.Wrap("error preparing ceph image", err)
 	}
-	// Also check block size
-	blockSize, err := cephImage.BlockSize()
-	if err != nil {
-		return err
-	}
+	//// Also check block size
+	// XXX this doesn't work - object size != block size
+	//blockSize, err := cephImage.BlockSize()
+	//if err != nil {
+	//	return err
+	//}
 	// Prep ZFS side
-	t.log.Log("Preparing ZFS")
+	t.log.SetStatus(status.MakeStatus(status.Preparing, "Preparing ZFS"))
 	zplog := t.log.MakeOrReplaceChild("Find/Create Dataset", true)
+
 	// TODO: this isn't very much a "prep" step
-	zv, err := t.zfsContext.PrepareChild(t.Label(), size, blockSize, zplog)
+	zv, err := t.zfsContext.PrepareChild(t.Label(), size, zplog)
 	if err != nil {
-		zplog.SetStatusByError(err)
-		return err
+		wrapped := util.Wrap("error preparing zfs dataset", err)
+		zplog.SetStatusByError(wrapped)
+		return wrapped
 	}
 	// Find the most recent common snapshot between the two, using the name as the key
 	zvolSnaps, err := zv.Snapshots()
 	if err != nil {
-		return err
+		return util.Wrap("error getting ZFS snapshots", err)
 	}
 	cephSnaps, err := cephImage.SnapNames()
 	if err != nil {
-		return err
+		return util.Wrap("error getting ceph snaps", err)
 	}
 	// Reverses in place
 	slices.Reverse(cephSnaps)
@@ -167,7 +182,7 @@ func (t *ImageBackupTask) Run() (err error) {
 		t.log.SetStatus(status.MakeStatus(status.Preparing, fmt.Sprintf("Reverting ZFS to %v", mostRecentName)))
 		err = zv.RevertTo(mostRecentCommon)
 		if err != nil {
-			return err
+			return util.WrapFmt(err, "error reverting ZFS to %v@%v", t.imageName, mostRecentName)
 		}
 	}
 	var mostRecentNameFmt string
@@ -178,10 +193,7 @@ func (t *ImageBackupTask) Run() (err error) {
 	}
 	t.log.Log("Plan: %v -> %v", mostRecentNameFmt, snapName)
 
-	node, err := zv.DevNode()
-	if err != nil {
-		return err
-	}
+	node := zv.DevNode()
 	t.log.SetStatus(status.MakeStatus(status.Preparing, "Opening zvol device node"))
 	var file *os.File
 	for tries := 5; tries > 0; {
@@ -190,15 +202,14 @@ func (t *ImageBackupTask) Run() (err error) {
 		file, fileErr = os.OpenFile(node, os.O_WRONLY, 600)
 		if fileErr != nil {
 			if tries <= 0 {
-				return err
+				return util.WrapFmt(fileErr, "Failed to open Zvol device %v", node)
 			} else {
 				t.log.Log("Retrying to open zvol device node (error: %v)", fileErr)
 				time.Sleep(5 * time.Second)
 			}
 		}
-
 	}
-	//goland:noinspection GoUnhandledErrorResult
+
 	defer func() {
 		if file != nil {
 			file.Close()
@@ -207,16 +218,18 @@ func (t *ImageBackupTask) Run() (err error) {
 
 	t.log.SetStatus(status.MakeStatus(status.InProgress, "Copying data"))
 
+	// TODO: allow buffering between the reads and writes
+	var diffErr error
 	err = cephImage.DiffIter(mostRecentName, func(offset uint64, length uint64, exists int, _ interface{}) int {
 		if exists > 0 {
 			bytes, errInner := cephImage.Read(offset, length)
-			if err != nil {
-				err = errInner
+			if errInner != nil {
+				diffErr = errInner
 				return 1
 			}
 			_, errInner = file.WriteAt(bytes, int64(offset))
 			if errInner != nil {
-				err = errInner
+				diffErr = errInner
 				return 1
 			}
 			bytesWritten += length
@@ -237,16 +250,21 @@ func (t *ImageBackupTask) Run() (err error) {
 				uintptr(unsafe.Pointer(&rangeBytes[0])),
 			)
 			if errno != 0 {
-				err = errors.New("Syscall error: " + errno.Error())
+				diffErr = util.Wrap("error copying data", errors.New("Syscall error: "+errno.Error()))
 				return 1
 			}
 			bytesTrimmed += length
 			return 0
 		}
 	})
+
 	if err != nil {
-		return err
+		return util.Wrap("error copying data", err)
 	}
+	if diffErr != nil {
+		return util.Wrap("error copying data", diffErr)
+	}
+
 	t.log.SetStatus(status.MakeStatus(status.Finishing, "Flushing"))
 	err = file.Close()
 	if err != nil {
@@ -258,7 +276,12 @@ func (t *ImageBackupTask) Run() (err error) {
 
 	_, err = zv.NewSnapshot(snapName)
 	if err != nil {
-		return err
+		return util.Wrap("error creating snapshot", err)
+	}
+	t.finalData = &finalData{
+		zfsSnapshotName: snapName,
+		bytesWritten:    bytesWritten,
+		bytesTrimmed:    bytesTrimmed,
 	}
 	return nil
 }

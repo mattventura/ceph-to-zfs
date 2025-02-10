@@ -64,7 +64,7 @@ func (mt *ManagedTask) Prepare() (err error) {
 	return mt.doPrep()
 }
 
-func (mt *ManagedTask) Run() (err error) {
+func (mt *ManagedTask) Run(successMsg func() string) (err error) {
 	locked := mt.mut.TryLock()
 	if !locked {
 		// TODO: we don't really want it to complain if you request it to run
@@ -92,7 +92,11 @@ func (mt *ManagedTask) Run() (err error) {
 		return err
 	}
 	// TODO: msg configuration
-	err = mt.log.SetFinished("")
+	if successMsg != nil {
+		err = mt.log.SetFinished(successMsg())
+	} else {
+		err = mt.log.SetFinished("")
+	}
 	return err
 }
 

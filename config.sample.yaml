@@ -23,3 +23,5 @@ jobs:
     # If only `imageExcludeRegex` is specified, then all images except those matching the pattern will be included.
     imageExcludeRegex: 'vm-disk-swap.*'
     imageIncludeRegex: 'vm-disk-.*'
+    # How many images to process concurrently. Defaults to 2.
+    maxConcurrency: 5

@@ -62,7 +62,7 @@ func (t *TopLevelTask) run() error {
 }
 
 func (t *TopLevelTask) Run() error {
-	return t.mt.Run()
+	return t.mt.Run(nil)
 }
 
 func (t *TopLevelTask) Prepare() error {

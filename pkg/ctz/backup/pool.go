@@ -8,8 +8,10 @@ import (
 	"ceph-to-zfs/pkg/ctz/task"
 	"ceph-to-zfs/pkg/ctz/util"
 	"ceph-to-zfs/pkg/ctz/zfssupport"
+	context2 "context"
 	"fmt"
 	"github.com/ceph/go-ceph/rbd"
+	"golang.org/x/sync/semaphore"
 	"runtime"
 	"sync"
 )
@@ -120,7 +122,14 @@ func (t *PoolBackupTask) prep() (err error) {
 			excluded = append(excluded, name)
 		}
 	}
+
 	t.children = children
+
+	if len(children) == 0 {
+		t.log.SetStatus(status.MakeStatus(status.Failed, "No images found to back up"))
+		return nil
+	}
+
 	t.log.Log("Included: %v", included)
 	t.log.Log("Excluded: %v", excluded)
 	return nil
@@ -143,12 +152,32 @@ func (t *PoolBackupTask) run() (err error) {
 	defer func() { go context.Destroy() }()
 
 	children := t.children
+
+	if len(children) == 0 {
+		t.log.SetStatus(status.MakeStatus(status.Failed, "No images found to back up"))
+		return nil
+	}
+
 	t.log.SetStatus(status.MakeStatus(status.InProgress, "Running Children"))
 	childrenFailed := 0
+
+	// Wait for all children to finish
 	wg := &sync.WaitGroup{}
+	// Limit concurrency
+	sem := semaphore.NewWeighted(int64(t.jobConfig.MaxConcurrency))
+
 	for _, child := range children {
 		wg.Add(1)
 		go func() {
+			acquire := sem.TryAcquire(1)
+			if !acquire {
+				child.log.SetStatus(status.MakeStatus(status.Waiting, "Waiting for concurrency limit"))
+				err := sem.Acquire(context2.TODO(), 1)
+				if err != nil {
+					child.log.SetStatus(status.MakeStatus(status.Failed, "Failed to acquire semaphore"))
+				}
+			}
+			defer sem.Release(1)
 			defer wg.Done()
 			defer func() {
 				rec := recover()
@@ -168,7 +197,7 @@ func (t *PoolBackupTask) run() (err error) {
 }
 
 func (t *PoolBackupTask) Run() error {
-	return t.mt.Run()
+	return t.mt.Run(nil)
 }
 
 func (t *PoolBackupTask) Prepare() (err error) {

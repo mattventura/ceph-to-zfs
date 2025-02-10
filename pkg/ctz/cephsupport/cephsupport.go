@@ -33,11 +33,11 @@ func (i *CephImageView) SnapNames() ([]string, error) {
 func (i *CephImageView) SnapAndActivate(snapName string) error {
 	_, err := i.image.CreateSnapshot(snapName)
 	if err != nil {
-		return err
+		return util.WrapFmt(err, "error creating snapshot %s", snapName)
 	}
 	err = i.image.SetSnapshot(snapName)
 	if err != nil {
-		return err
+		return util.WrapFmt(err, "error setting snapshot %s", snapName)
 	}
 	return nil
 }
@@ -51,7 +51,7 @@ func (i *CephImageView) BlockSize() (uint64, error) {
 }
 
 func (i *CephImageView) DiffIter(snapName string, callback rbd.DiffIterateCallback) error {
-	config := rbd.DiffIterateConfig{
+	c := rbd.DiffIterateConfig{
 		Offset: 0,
 		// Length can be larger than needed
 		Length:        (1 << 62) - 1,
@@ -60,7 +60,7 @@ func (i *CephImageView) DiffIter(snapName string, callback rbd.DiffIterateCallba
 		WholeObject:   rbd.DisableWholeObject,
 		Callback:      callback,
 	}
-	err := i.image.DiffIterate(config)
+	err := i.image.DiffIterate(c)
 	if err != nil {
 		return err
 	}
@@ -84,15 +84,15 @@ func Connect(cfg *config.CephClusterConfig) (*rados.Conn, error) {
 	//conn, err := rados.NewConnWithClusterAndUser(cfg.ClusterName, cfg.AuthName)
 	conn, err := rados.NewConn()
 	if err != nil {
-		return nil, err
+		return nil, util.Wrap("error creating rados connection", err)
 	}
 	err = conn.ReadConfigFile(cfg.ConfFile)
 	if err != nil {
-		return nil, err
+		return nil, util.Wrap("error reading config file", err)
 	}
 	err = conn.Connect()
 	if err != nil {
-		return nil, err
+		return nil, util.Wrap("error connecting to ceph server", err)
 	}
 	return conn, nil
 }

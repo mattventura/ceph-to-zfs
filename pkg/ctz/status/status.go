@@ -32,14 +32,17 @@ type StatusType interface {
 	// IsTerminal indicates that the task is no longer processing anything. The status will
 	// not change until something triggers a new run of the task.
 	IsTerminal() bool
-	// IsBad indicates that the status indicates some sort of failure
+	// IsBad indicates that the status represents some sort of failure.
 	IsBad() bool
+	// IsActive indicates that the task is actively doing something.
+	IsActive() bool
 }
 
 type statusType struct {
 	label      string
 	isTerminal bool
 	isBad      bool
+	isActive   bool
 }
 
 func (s *statusType) Label() string {
@@ -54,18 +57,28 @@ func (s *statusType) IsBad() bool {
 	return s.isBad
 }
 
+func (s *statusType) IsActive() bool {
+	return s.isActive
+}
+
 var (
 	// predefined statuses
 
-	NotStarted     StatusType = &statusType{label: "Not Started"}
-	Preparing      StatusType = &statusType{label: "Preparing"}
-	Ready          StatusType = &statusType{label: "Ready"}
-	InProgress     StatusType = &statusType{label: "In Progress"}
-	Active         StatusType = &statusType{label: "Active"}
-	Finishing      StatusType = &statusType{label: "Finishing"}
-	Success        StatusType = &statusType{label: "Success", isTerminal: true}
-	Failed         StatusType = &statusType{label: "Failed", isTerminal: true, isBad: true}
-	Skipped        StatusType = &statusType{label: "Skipped", isTerminal: true}
+	// Job has not started at all
+	NotStarted StatusType = &statusType{label: "Not Started"}
+	// Waiting on another job or concurrency limit
+	Waiting StatusType = &statusType{label: "Waiting"}
+	// Preparing indicates that the job is doing some prep work or enumerating children.
+	Preparing  StatusType = &statusType{label: "Preparing", isActive: true}
+	Ready      StatusType = &statusType{label: "Ready"}
+	InProgress StatusType = &statusType{label: "In Progress", isActive: true}
+	Active     StatusType = &statusType{label: "Active", isActive: true}
+	Finishing  StatusType = &statusType{label: "Finishing", isActive: true}
+	Success    StatusType = &statusType{label: "Success", isTerminal: true}
+	Failed     StatusType = &statusType{label: "Failed", isTerminal: true, isBad: true}
+	// Skipped indicates that the job never started, but its parent finished
+	Skipped StatusType = &statusType{label: "Skipped", isTerminal: true}
+	// ChildrenFailed indicates that regardless of whether the job was successful, one or more children failed.
 	ChildrenFailed StatusType = &statusType{label: "Children Failed", isTerminal: true, isBad: true}
 
 	// interface checks

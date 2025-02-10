@@ -50,9 +50,9 @@ func (z *ZvolDestination) RevertTo(snap *ZvolSnapshot) error {
 	return nil
 }
 
-func (z *ZvolDestination) DevNode() (string, error) {
+func (z *ZvolDestination) DevNode() string {
 	path := z.dataset.Name
-	return fmt.Sprintf("/dev/zvol/%s", path), nil
+	return fmt.Sprintf("/dev/zvol/%s", path)
 }
 
 func (z *ZvolDestination) NewSnapshot(name string) (*zfs.Dataset, error) {
@@ -80,7 +80,7 @@ func ZfsContextByPath(path string) (*ZfsContext, error) {
 // not exist, it will be created. If it exists but is too small (e.g. due to expanding the image on the Ceph side),
 // it will be expanded. Otherwise, it will be returned as-is. Note that if the image exists, but the block size is
 // wrong, no attempt will be made to correct it.
-func (z *ZfsContext) PrepareChild(name string, neededSize uint64, prefBlockSize uint64, log *logging.JobStatusLogger) (dest *ZvolDestination, err error) {
+func (z *ZfsContext) PrepareChild(name string, neededSize uint64, log *logging.JobStatusLogger) (dest *ZvolDestination, err error) {
 	baseName := z.baseDataset.Name
 
 	expectedPath := baseName + "/" + name

@@ -17,8 +17,15 @@ func StartWebInterface(topLevel task.PreparableTask, port int) error {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+		SkipPaths: []string{"/api/alltasks"},
 		Formatter: func(params gin.LogFormatterParams) string {
 			if params.ErrorMessage == "" {
+				// Don't log normal successful requests
+				// TODO this doesn't work here - this can only reformat, not skip, and the
+				// "Skip" field also doesn't seem to allow access to these fields.
+				//if params.StatusCode != http.StatusOK {
+				//	return fmt.Sprintf("(%v) %v %v %#v", params.ClientIP, params.StatusCode, params.Method, params.Path)
+				//}
 				return fmt.Sprintf("(%v) %v %v %#v", params.ClientIP, params.StatusCode, params.Method, params.Path)
 			} else {
 				return fmt.Sprintf("(%v) %v %v %#v\n%v", params.ClientIP, params.StatusCode, params.Method, params.Path, params.ErrorMessage)
@@ -75,6 +82,7 @@ func ToTaskView(t task.Task) TaskView {
 			Message:    s.Msg(),
 			IsBad:      st.IsBad(),
 			IsTerminal: st.IsTerminal(),
+			IsActive:   st.IsActive(),
 		},
 		Children: util.Map(t.Children(), ToTaskView),
 	}
@@ -85,4 +93,5 @@ type StatusView struct {
 	Message    string `json:"message"`
 	IsBad      bool   `json:"isBad"`
 	IsTerminal bool   `json:"isTerminal"`
+	IsActive   bool   `json:"isActive"`
 }

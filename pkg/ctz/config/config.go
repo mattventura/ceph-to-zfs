@@ -37,6 +37,7 @@ type PoolJobRawConfig struct {
 	ZfsDestination    string `yaml:"zfsDestination" binding:"required"`
 	ImageIncludeRegex string `yaml:"imageIncludeRegex" binding:"required"`
 	ImageExcludeRegex string `yaml:"imageExcludeRegex" binding:"required"`
+	MaxConcurrency    *int   `yaml:"maxConcurrency" binding:"required"`
 }
 
 type PoolJobProcessedConfig struct {
@@ -47,6 +48,7 @@ type PoolJobProcessedConfig struct {
 	ZfsDestination    string
 	ImageIncludeRegex *regexp.Regexp
 	ImageExcludeRegex *regexp.Regexp
+	MaxConcurrency    int
 }
 
 var idPattern = regexp.MustCompile("^[a-zA-Z0-9._-]+$")
@@ -73,14 +75,19 @@ func FromYamlFile(filepath string) (*TopLevelProcessedConfig, error) {
 		}
 	}
 	var jobs []*PoolJobProcessedConfig
+	jobIds := make(map[string]bool)
 	for i, rawJob := range rawConfig.Jobs {
 		clusterKey := rawJob.Cluster
+		if jobIds[rawJob.Id] == true {
+			return nil, errors.New("duplicate job name: " + rawJob.Id)
+		}
 		if rawJob.Id == "" {
 			return nil, errors.New(fmt.Sprintf("job id must be specified (job #%v)", i))
 		}
 		if !idPattern.MatchString(rawJob.Id) {
 			return nil, errors.New("job id must contain only alphanumeric, hyphen, underscores: '" + rawJob.Id + "'")
 		}
+		jobIds[rawJob.Id] = true
 		if rawJob.Label == "" {
 			rawJob.Label = rawJob.Id
 		}
@@ -111,6 +118,15 @@ func FromYamlFile(filepath string) (*TopLevelProcessedConfig, error) {
 		if rawJob.ZfsDestination == "" {
 			return nil, errors.New(fmt.Sprintf("zfsDestination is missing in job config '%v'", rawJob.Label))
 		}
+		var conc int
+		if rawJob.MaxConcurrency != nil {
+			conc = *rawJob.MaxConcurrency
+			if conc < 1 {
+				return nil, errors.New(fmt.Sprintf("maxConcurrency '%v' is invalid - must be greater than 0", rawJob.MaxConcurrency))
+			}
+		} else {
+			conc = 2
+		}
 		job := &PoolJobProcessedConfig{
 			Id:                rawJob.Id,
 			Label:             rawJob.Label,
@@ -119,6 +135,7 @@ func FromYamlFile(filepath string) (*TopLevelProcessedConfig, error) {
 			ZfsDestination:    rawJob.ZfsDestination,
 			ImageIncludeRegex: include,
 			ImageExcludeRegex: exclude,
+			MaxConcurrency:    conc,
 		}
 		jobs = append(jobs, job)
 	}

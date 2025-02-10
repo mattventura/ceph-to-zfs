@@ -49,3 +49,11 @@ This project aims to, in the long term, become an improvement over the alternati
 
 In the long term, I am to make the system work in a similar way to Zrepl, where it supports pushing to a remote daemon,
 wildcard selection of filesystems and volumes, and has a UI for viewing backup status.
+
+
+# Feature TODOs
+
+- [X] RBD Backups
+- [ ] CephFS Backups
+- [ ] Snapshot Pruning
+- [ ] Concurrency control

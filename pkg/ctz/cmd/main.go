@@ -57,6 +57,7 @@ func main() {
 		os.Exit(64)
 	}
 	if *webEnable && !*oneShot {
+		go task.Prepare()
 		// Block forever
 		select {}
 	}
