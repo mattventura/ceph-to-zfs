@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 )
 
 type Task interface {
@@ -39,6 +40,7 @@ type ManagedTask struct {
 func NewManagedTask(logger *logging.JobStatusLogger, prepFunc func() error, taskFunc func() error) *ManagedTask {
 	return &ManagedTask{log: logger, prepFunc: prepFunc, taskFunc: taskFunc, mut: &sync.Mutex{}}
 }
+
 func (mt *ManagedTask) doPrep() error {
 	mt.log.SetSimpleStatus(status.Preparing)
 	err := mt.prepFunc()
@@ -51,6 +53,7 @@ func (mt *ManagedTask) doPrep() error {
 }
 
 func (mt *ManagedTask) Prepare() (err error) {
+	mt.log.ResetData()
 	defer func() {
 		if err != nil {
 			mt.log.SetStatus(status.MakeStatus(status.Failed, err.Error()))
@@ -61,6 +64,14 @@ func (mt *ManagedTask) Prepare() (err error) {
 		return InProgressError
 	}
 	defer mt.mut.Unlock()
+	start := time.Now()
+	defer func() {
+		mt.log.SetExtraData("prepStartTime", float64(start.UnixMilli())/1000.0)
+		end := time.Now()
+		diff := end.Sub(start)
+		mt.log.SetExtraData("prepEndTime", float64(end.UnixMilli())/1000.0)
+		mt.log.SetExtraData("prepTime", float64(diff.Milliseconds())/1000.0)
+	}()
 	return mt.doPrep()
 }
 
@@ -87,11 +98,18 @@ func (mt *ManagedTask) Run(successMsg func() string) (err error) {
 			return err
 		}
 	}
+	start := time.Now()
+	mt.log.SetExtraData("runStartTime", float64(start.UnixMilli())/1000.0)
+	defer func() {
+		end := time.Now()
+		diff := end.Sub(start)
+		mt.log.SetExtraData("runEndTime", float64(end.UnixMilli())/1000.0)
+		mt.log.SetExtraData("runTime", float64(diff.Milliseconds())/1000.0)
+	}()
 	err = mt.taskFunc()
 	if err != nil {
 		return err
 	}
-	// TODO: msg configuration
 	if successMsg != nil {
 		err = mt.log.SetFinished(successMsg())
 	} else {

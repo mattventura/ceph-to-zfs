@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 )
 import "github.com/gin-gonic/gin"
 
@@ -38,7 +39,7 @@ func StartWebInterface(topLevel task.PreparableTask, port int) error {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	})
 	r.GET("/api/alltasks", func(c *gin.Context) {
-		c.JSON(http.StatusOK, ToTaskView(topLevel))
+		c.JSON(http.StatusOK, ToTasksResponse(topLevel))
 	})
 	r.GET("/api/startall", func(c *gin.Context) {
 		go topLevel.Run()
@@ -64,11 +65,34 @@ func StartWebInterface(topLevel task.PreparableTask, port int) error {
 	return nil
 }
 
+type TasksResponse struct {
+	ServerInfo ServerInfo `json:"serverInfo"`
+	Task       TaskView   `json:"task"`
+}
+
+type ServerInfo struct {
+	UnixTime float64 `json:"unixTime"`
+}
+
 type TaskView struct {
-	Id       string     `json:"id"`
-	Label    string     `json:"label"`
-	Status   StatusView `json:"status"`
-	Children []TaskView `json:"children"`
+	Id        string         `json:"id"`
+	Label     string         `json:"label"`
+	Status    StatusView     `json:"status"`
+	ExtraData map[string]any `json:"extraData"`
+	Children  []TaskView     `json:"children"`
+}
+
+func MakeServerInfo() ServerInfo {
+	return ServerInfo{
+		UnixTime: float64(time.Now().UnixMilli()) / 1000.0,
+	}
+}
+
+func ToTasksResponse(t task.Task) TasksResponse {
+	return TasksResponse{
+		ServerInfo: MakeServerInfo(),
+		Task:       ToTaskView(t),
+	}
 }
 
 func ToTaskView(t task.Task) TaskView {
@@ -84,7 +108,8 @@ func ToTaskView(t task.Task) TaskView {
 			IsTerminal: st.IsTerminal(),
 			IsActive:   st.IsActive(),
 		},
-		Children: util.Map(t.Children(), ToTaskView),
+		ExtraData: t.StatusLog().GetExtraData(),
+		Children:  util.Map(t.Children(), ToTaskView),
 	}
 }
 

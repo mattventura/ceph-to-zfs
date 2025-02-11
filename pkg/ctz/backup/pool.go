@@ -164,6 +164,7 @@ func (t *PoolBackupTask) run() (err error) {
 	// Wait for all children to finish
 	wg := &sync.WaitGroup{}
 	// Limit concurrency
+	// TODO: move this and put the semaphore logic in the child
 	sem := semaphore.NewWeighted(int64(t.jobConfig.MaxConcurrency))
 
 	for _, child := range children {

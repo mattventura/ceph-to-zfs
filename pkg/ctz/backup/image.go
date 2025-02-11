@@ -97,6 +97,7 @@ func (t *ImageBackupTask) run() error {
 	snapName := "ctz-" + time.Now().Format("2006-01-02-15:04:05")
 
 	t.log.SetStatus(status.SimpleStatus(status.Preparing))
+	t.log.SetExtraData("snapName", snapName)
 
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -233,6 +234,7 @@ func (t *ImageBackupTask) run() error {
 				return 1
 			}
 			bytesWritten += length
+			t.log.SetExtraData("bytesWritten", bytesWritten)
 			return 0
 		} else {
 
@@ -253,10 +255,13 @@ func (t *ImageBackupTask) run() error {
 				diffErr = util.Wrap("error copying data", errors.New("Syscall error: "+errno.Error()))
 				return 1
 			}
+			t.log.SetExtraData("bytesTrimmed", bytesTrimmed)
 			bytesTrimmed += length
 			return 0
 		}
 	})
+	t.log.SetExtraData("bytesWritten", bytesWritten)
+	t.log.SetExtraData("bytesTrimmed", bytesTrimmed)
 
 	if err != nil {
 		return util.Wrap("error copying data", err)

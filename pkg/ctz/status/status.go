@@ -81,6 +81,8 @@ var (
 	// ChildrenFailed indicates that regardless of whether the job was successful, one or more children failed.
 	ChildrenFailed StatusType = &statusType{label: "Children Failed", isTerminal: true, isBad: true}
 
+	// TODO: status for no children? or a toggle to allow this to fail
+
 	// interface checks
 	_ StatusType = &statusType{}
 )

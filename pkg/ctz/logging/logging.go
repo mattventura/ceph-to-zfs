@@ -67,6 +67,7 @@ type JobStatusLogger struct {
 	logMsgs       []string
 	children      map[LoggerKey]*JobStatusLogger
 	status        status.Status
+	extraData     map[string]any
 }
 
 func NewRootLogger(name string) *JobStatusLogger {
@@ -84,6 +85,7 @@ func newJobStatusLogger(name LoggerKey, parent *JobStatusLogger, includeParent b
 		logFunc:       logFunc,
 		children:      children,
 		status:        status.SimpleStatus(status.NotStarted),
+		extraData:     make(map[string]any),
 	}
 }
 
@@ -194,6 +196,18 @@ func (l *JobStatusLogger) SimpleRun(f func() error) error {
 		l.SetSimpleStatus(status.Success)
 	}
 	return err
+}
+
+func (l *JobStatusLogger) ResetData() {
+	l.extraData = make(map[string]any)
+}
+
+func (l *JobStatusLogger) SetExtraData(key string, value any) {
+	l.extraData[key] = value
+}
+
+func (l *JobStatusLogger) GetExtraData() map[string]any {
+	return l.extraData
 }
 
 type asWriter struct {
