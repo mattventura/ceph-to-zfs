@@ -1,15 +1,32 @@
 package cephsupport
 
 import (
-	"ceph-to-zfs/pkg/ctz/config"
-	"ceph-to-zfs/pkg/ctz/util"
 	"github.com/ceph/go-ceph/rados"
 	"github.com/ceph/go-ceph/rbd"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/config"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/models"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/util"
+	"time"
 )
 
 type CephImageView struct {
 	image *rbd.Image
 }
+
+type CephSnapshot struct {
+	name string
+	when time.Time
+}
+
+func (c *CephSnapshot) Name() string {
+	return c.name
+}
+
+func (c *CephSnapshot) When() time.Time {
+	return c.when
+}
+
+var _ models.Snapshot = &CephSnapshot{}
 
 func (i *CephImageView) Name() string {
 	return i.image.GetName()
@@ -28,6 +45,26 @@ func (i *CephImageView) SnapNames() ([]string, error) {
 		return in.Name
 	})
 	return snapNames, nil
+}
+
+func (i *CephImageView) Snapshots() ([]*CephSnapshot, error) {
+	snaps, err := i.image.GetSnapshotNames()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*CephSnapshot, len(snaps))
+	// TODO: this is slow to do in serial
+	for j, snap := range snaps {
+		timestamp, err := i.image.GetSnapTimestamp(snap.Id)
+		if err != nil {
+			return nil, err
+		}
+		out[j] = &CephSnapshot{
+			name: snap.Name,
+			when: time.Unix(timestamp.Sec, timestamp.Nsec),
+		}
+	}
+	return out, nil
 }
 
 func (i *CephImageView) SnapAndActivate(snapName string) error {

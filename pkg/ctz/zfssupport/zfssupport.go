@@ -1,13 +1,16 @@
 package zfssupport
 
 import (
-	"ceph-to-zfs/pkg/ctz/logging"
-	"ceph-to-zfs/pkg/ctz/status"
 	"fmt"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/logging"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/models"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/status"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/util"
 	"github.com/mistifyio/go-zfs"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ZvolDestination represents an already-prepared Zvol. It should already exist with an appropriate size.
@@ -16,9 +19,24 @@ type ZvolDestination struct {
 }
 
 type ZvolSnapshot struct {
-	Name        string
-	SnapDataSet *zfs.Dataset
+	snapName string
+	ds       *zfs.Dataset
+	date     time.Time
 }
+
+func (z *ZvolSnapshot) Name() string {
+	return z.snapName
+}
+
+func (z *ZvolSnapshot) When() time.Time {
+	return z.date
+}
+
+func (z *ZvolSnapshot) Dataset() *zfs.Dataset {
+	return z.ds
+}
+
+var _ models.Snapshot = &ZvolSnapshot{}
 
 func (z *ZvolDestination) Snapshots() ([]*ZvolSnapshot, error) {
 	snapshots, err := z.dataset.Snapshots()
@@ -26,24 +44,35 @@ func (z *ZvolDestination) Snapshots() ([]*ZvolSnapshot, error) {
 		return nil, err
 	}
 	var out []*ZvolSnapshot
-	for _, snapshot := range snapshots {
+	for i, snapshot := range snapshots {
+		_ = i
 		path := snapshot.Name
 		// ZFS snapshot names use the format pool/path/to/dataset@snapname, but we just want the 'snapname'
 		parts := strings.Split(path, "@")
 		if len(parts) != 2 {
 			return nil, fmt.Errorf("snapshot path %s does not look like a valid zfs snapshot name", path)
 		}
+		creationRaw, err := GetProperty(snapshot, "creation")
+		if err != nil {
+			return nil, util.Wrap("error getting creation property", err)
+		}
+		creationUnix, err := strconv.ParseInt(creationRaw, 10, 64)
+		if err != nil {
+			return nil, util.WrapFmt(err, "error parsing creation property '%v'", creationRaw)
+		}
+
 		snapName := parts[1]
 		out = append(out, &ZvolSnapshot{
-			Name:        snapName,
-			SnapDataSet: snapshot,
+			snapName: snapName,
+			ds:       snapshot,
+			date:     time.Unix(creationUnix, 0),
 		})
 	}
 	return out, nil
 }
 
 func (z *ZvolDestination) RevertTo(snap *ZvolSnapshot) error {
-	err := snap.SnapDataSet.Rollback(true)
+	err := snap.Dataset().Rollback(true)
 	if err != nil {
 		return err
 	}
@@ -132,4 +161,21 @@ func createVolume(name string, size uint64) (*zfs.Dataset, error) {
 		return nil, err
 	}
 	return zfs.GetDataset(name)
+}
+
+func GetProperty(dataset *zfs.Dataset, property string) (string, error) {
+	args := []string{
+		"get",
+		"-p",          // parseable values
+		"-H",          // omit header
+		"-o", "value", // only print the value, no other cols
+		property,
+		dataset.Name,
+	}
+	cmd := exec.Command("zfs", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(string(output), "\n"), nil
 }

@@ -1,0 +1,50 @@
+clusters:
+
+  myCluster:
+    authName: 'client.admin'
+    confFile: '/etc/ceph/ceph.conf'
+    clusterName: 'ceph'
+
+jobs:
+  - id: None
+    cluster: myCluster
+    cephPoolName: vm-pool
+    zfsDestination: 'tank3/ceph-rbd-backups'
+
+  - id: Empty
+    cluster: myCluster
+    cephPoolName: vm-pool
+    zfsDestination: 'tank3/ceph-rbd-backups'
+    pruning: {}
+
+  - id: LastN
+    cluster: 'myCluster'
+    cephPoolName: 'vm-pool'
+    zfsDestination: 'tank3/ceph-rbd-backups'
+    pruning:
+      keepSender:
+        - type: lastN
+          count: 5
+          regex: "foo.*bar"
+        - type: lastN
+          count: 5
+
+  - id: KeepRegex
+    cluster: 'myCluster'
+    cephPoolName: 'vm-pool'
+    zfsDestination: 'tank3/ceph-rbd-backups'
+    pruning:
+      keepReceiver:
+        - type: regex
+          regex: "foo.*bar"
+
+  - id: KeepGrid
+    cluster: 'myCluster'
+    cephPoolName: 'vm-pool'
+    zfsDestination: 'tank3/ceph-rbd-backups'
+    pruning:
+      keepReceiver:
+        - type: grid
+          grid: '1x1h(keep=all) | 24x3h | 7x1d | 2x7d | 3x30d | 1x60d | 3x180d'
+          regex: "foo.*bar"
+

@@ -1,11 +1,11 @@
 package backup
 
 import (
-	"ceph-to-zfs/pkg/ctz/config"
-	"ceph-to-zfs/pkg/ctz/logging"
-	"ceph-to-zfs/pkg/ctz/status"
-	"ceph-to-zfs/pkg/ctz/task"
-	"ceph-to-zfs/pkg/ctz/util"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/config"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/logging"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/status"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/task"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/util"
 	"sync"
 )
 

@@ -1,16 +1,16 @@
 package backup
 
 import (
-	"ceph-to-zfs/pkg/ctz/cephsupport"
-	"ceph-to-zfs/pkg/ctz/config"
-	"ceph-to-zfs/pkg/ctz/logging"
-	"ceph-to-zfs/pkg/ctz/status"
-	"ceph-to-zfs/pkg/ctz/task"
-	"ceph-to-zfs/pkg/ctz/util"
-	"ceph-to-zfs/pkg/ctz/zfssupport"
 	context2 "context"
 	"fmt"
 	"github.com/ceph/go-ceph/rbd"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/cephsupport"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/config"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/logging"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/status"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/task"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/util"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/zfssupport"
 	"golang.org/x/sync/semaphore"
 	"runtime"
 	"sync"
@@ -30,7 +30,7 @@ func NewPoolBackupTask(
 	jobConfig *config.PoolJobProcessedConfig,
 	parentLog *logging.JobStatusLogger,
 ) *PoolBackupTask {
-	log := parentLog.MakeOrReplaceChild(logging.LoggerKey(jobConfig.Label), false)
+	log := parentLog.MakeOrReplaceChild(logging.LoggerKey(jobConfig.Id), false)
 	out := &PoolBackupTask{
 		cephConfig: jobConfig.ClusterConfig,
 		jobConfig:  jobConfig,
@@ -113,7 +113,7 @@ func (t *PoolBackupTask) prep() (err error) {
 			t.log.Log("Image %v included", name)
 			tsk := t.childMap[name]
 			if tsk == nil {
-				tsk = NewImageBackupTask(name, t.cephConfig, t.poolName, zfsContext, t.log)
+				tsk = NewImageBackupTask(name, t.cephConfig, t.poolName, zfsContext, t.log, t.jobConfig.Pruning)
 				t.childMap[name] = tsk
 			}
 			children = append(children, tsk)

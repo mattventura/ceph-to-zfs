@@ -1,0 +1,42 @@
+clusters:
+
+  myCluster:
+    authName: 'client.admin'
+    confFile: '/etc/ceph/ceph.conf'
+    clusterName: 'ceph'
+
+  altCluster:
+    authName: 'client.backups'
+    confFile: '/etc/ceph/ceph2.conf'
+    clusterName: 'ceph2'
+
+jobs:
+  - id: Backup_VMs
+    label: 'Backup VM Images'
+    cluster: 'myCluster'
+    cephPoolName: 'vm-pool'
+    zfsDestination: 'tank3/ceph-rbd-backups'
+    imageIncludeRegex: 'vm-\d+-disk-.*'
+    maxConcurrency: 3
+
+  - id: Backup_Templates
+    label: 'Backup VM Images 2 this job has a very long name'
+    cluster: 'altCluster'
+    cephPoolName: 'vm-pool'
+    zfsDestination: 'tank3/ceph-rbd-backups'
+    imageIncludeRegex: 'base-\d+-disk-.*'
+
+  - id: Empty
+    label: 'Dummy empty job'
+    cluster: 'myCluster'
+    cephPoolName: 'vm-pool'
+    zfsDestination: 'tank3/ceph-rbd-backups'
+    imageExcludeRegex: 'nothing'
+
+  - id: Fails
+    label: 'Fails on purpose'
+    cluster: 'myCluster'
+    cephPoolName: 'nonexistent'
+    zfsDestination: 'tank3/ceph-rbd-backups'
+    imageIncludeRegex: 'foo'
+    imageExcludeRegex: 'bar'

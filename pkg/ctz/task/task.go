@@ -1,10 +1,10 @@
 package task
 
 import (
-	"ceph-to-zfs/pkg/ctz/logging"
-	"ceph-to-zfs/pkg/ctz/status"
 	"errors"
 	"fmt"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/logging"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/status"
 	"sync"
 	"time"
 )
@@ -99,6 +99,7 @@ func (mt *ManagedTask) Run(successMsg func() string) (err error) {
 		}
 	}
 	start := time.Now()
+	mt.log.SetSimpleStatus(status.InProgress)
 	mt.log.SetExtraData("runStartTime", float64(start.UnixMilli())/1000.0)
 	defer func() {
 		end := time.Now()

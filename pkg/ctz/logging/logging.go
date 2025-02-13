@@ -1,9 +1,9 @@
 package logging
 
 import (
-	"ceph-to-zfs/pkg/ctz/status"
 	"errors"
 	"fmt"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/status"
 	"io"
 	"math"
 	"strings"
@@ -48,7 +48,7 @@ func Join[K ~string](elems []K, sep string) string {
 }
 
 func defaultLogFunc(path []LoggerKey, msg string) {
-	timeFmt := time.Now().Format("2006-01-02 15:04:05.123")
+	timeFmt := time.Now().Format("2006-01-02 15:04:05.000")
 	pathFmt := Join(path, " / ")
 	fmt.Printf("%v [ %v ]: %v\n", timeFmt, pathFmt, msg)
 }
@@ -68,6 +68,7 @@ type JobStatusLogger struct {
 	children      map[LoggerKey]*JobStatusLogger
 	status        status.Status
 	extraData     map[string]any
+	separateData  map[string]any
 }
 
 func NewRootLogger(name string) *JobStatusLogger {
@@ -86,6 +87,7 @@ func newJobStatusLogger(name LoggerKey, parent *JobStatusLogger, includeParent b
 		children:      children,
 		status:        status.SimpleStatus(status.NotStarted),
 		extraData:     make(map[string]any),
+		separateData:  make(map[string]any),
 	}
 }
 
@@ -120,6 +122,12 @@ func (l *JobStatusLogger) MakeOrReplaceChild(name LoggerKey, includeParent bool)
 }
 
 func (l *JobStatusLogger) Log(format string, args ...any) {
+	formatted := fmt.Sprintf(format, args...)
+	l.log(formatted)
+}
+
+// TODO: make warn/error distinct
+func (l *JobStatusLogger) Warn(format string, args ...any) {
 	formatted := fmt.Sprintf(format, args...)
 	l.log(formatted)
 }
@@ -200,6 +208,7 @@ func (l *JobStatusLogger) SimpleRun(f func() error) error {
 
 func (l *JobStatusLogger) ResetData() {
 	l.extraData = make(map[string]any)
+	l.separateData = make(map[string]any)
 }
 
 func (l *JobStatusLogger) SetExtraData(key string, value any) {
@@ -208,6 +217,14 @@ func (l *JobStatusLogger) SetExtraData(key string, value any) {
 
 func (l *JobStatusLogger) GetExtraData() map[string]any {
 	return l.extraData
+}
+
+func (l *JobStatusLogger) SetSeparateData(key string, value any) {
+	l.separateData[key] = value
+}
+
+func (l *JobStatusLogger) GetDetailData() map[string]any {
+	return l.separateData
 }
 
 type asWriter struct {

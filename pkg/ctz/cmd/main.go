@@ -1,11 +1,11 @@
 package main
 
 import (
-	"ceph-to-zfs/pkg/ctz/backup"
-	"ceph-to-zfs/pkg/ctz/config"
-	"ceph-to-zfs/pkg/ctz/web"
 	"flag"
 	"fmt"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/backup"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/config/builder"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/web"
 	"os"
 )
 
@@ -18,7 +18,7 @@ func main() {
 
 	//webIntfFlag := flag.Uint("web-port", -1, "enable web interface")
 	flag.Parse()
-	cfg, err := config.FromYamlFile(*configFile)
+	cfg, err := builder.FromYamlFile(*configFile)
 	if err != nil {
 		fmt.Printf("Error reading config file: %v\n", err)
 		os.Exit(1)

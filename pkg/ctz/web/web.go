@@ -1,14 +1,15 @@
 package web
 
 import (
-	"ceph-to-zfs/pkg/ctz/logging"
-	"ceph-to-zfs/pkg/ctz/status"
-	"ceph-to-zfs/pkg/ctz/task"
-	"ceph-to-zfs/pkg/ctz/util"
 	"fmt"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/logging"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/status"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/task"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/util"
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 import "github.com/gin-gonic/gin"
@@ -49,6 +50,24 @@ func StartWebInterface(topLevel task.PreparableTask, port int) error {
 		go topLevel.Prepare()
 		c.JSON(http.StatusOK, gin.H{"Status": "Started"})
 	})
+	r.GET("/api/taskdetails/*task", func(c *gin.Context) {
+		// TODO: root task
+		taskPath := c.Param("task")
+		parts := strings.Split(taskPath, "/")
+		l := topLevel.StatusLog()
+		var found bool
+		for _, part := range parts {
+			if part != "" {
+				l, found = l.Children()[logging.LoggerKey(part)]
+				if !found {
+					c.JSON(http.StatusNotFound, gin.H{"Error": fmt.Sprintf("task %s not found", part)})
+					return
+				}
+			}
+		}
+		c.JSON(http.StatusOK, ToTaskDetailResponse(l))
+
+	})
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Log("Failed to listen: %v", err)
@@ -68,6 +87,10 @@ func StartWebInterface(topLevel task.PreparableTask, port int) error {
 type TasksResponse struct {
 	ServerInfo ServerInfo `json:"serverInfo"`
 	Task       TaskView   `json:"task"`
+}
+
+type TaskDetailResponse struct {
+	DetailData map[string]any `json:"detailData"`
 }
 
 type ServerInfo struct {
@@ -92,6 +115,12 @@ func ToTasksResponse(t task.Task) TasksResponse {
 	return TasksResponse{
 		ServerInfo: MakeServerInfo(),
 		Task:       ToTaskView(t),
+	}
+}
+
+func ToTaskDetailResponse(l *logging.JobStatusLogger) TaskDetailResponse {
+	return TaskDetailResponse{
+		DetailData: l.GetDetailData(),
 	}
 }
 
