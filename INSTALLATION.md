@@ -10,7 +10,8 @@ apt install librados-dev librbd-dev
 # Clone and build the app. Alternatively, download the zip (see below).
 git clone https://github.com/mattventura/ceph-to-zfs.git
 cd ceph-to-zfs
-go build -o ./ctz ./pkg/ctz/cmd
+# If git did not make it executable, be sure to chmod +x it.
+./build.sh
 # Check that it built correctly
 ./ctz --help
 ```
@@ -22,6 +23,7 @@ Alternatively, if you do not wish to install git, you can use the github ZIP fil
 wget https://github.com/mattventura/ceph-to-zfs/archive/refs/heads/master.zip -O ctz.zip
 unzip ctz.zip
 cd ceph-to-zfs-master/
+chmod +x build.sh
 ```
 
 # ZFS Configuration
