@@ -1,11 +1,7 @@
 body {
-  font-family: Tahoma, sans-serif;
   --fg-main: #cfcfcf;
-  color: var(--fg-main);
   --bg-main: #30364a;
-  background-color: var(--bg-main);
   --bg-panel: #13182a;
-  font-size: large;
   --shadow-color: #00000060;
   --border-radius: 5px;
   --bg-sel: #48484f;
@@ -16,6 +12,10 @@ body {
   --fg-inprogress: #0f94ff;
   --fg-notstarted: #cfcfcf80;
   --fg-pruned: #b77d33;
+  font-family: Tahoma, sans-serif;
+  color: var(--fg-main);
+  background-color: var(--bg-main);
+  font-size: large;
 }
 button {
   border-radius: var(--border-radius);

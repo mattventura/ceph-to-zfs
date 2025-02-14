@@ -6,7 +6,7 @@ clusters:
     clusterName: 'ceph'
 
 jobs:
-  - # Only alphanumeric, hyphen, underscore
+  # Unique ID for job: Only alphanumeric, hyphen, underscore
   - id: Backup_VMs
     # Human readable label. Optional, uses the ID if not specified.
     label: 'Backup VM Images'
@@ -23,5 +23,29 @@ jobs:
     # If only `imageExcludeRegex` is specified, then all images except those matching the pattern will be included.
     imageExcludeRegex: 'vm-disk-swap.*'
     imageIncludeRegex: 'vm-disk-.*'
-    # How many images to process concurrently. Defaults to 2.
+    # How many images to process concurrently. Defaults to 2 if not specified.
     maxConcurrency: 5
+    # Optional: Schedule this job (not applicable to oneshot mode)
+    cron: '*/10 * * * *'
+    # Optional: Configuration for pruning snapshots
+    pruning:
+      # Basically the same as zrepl, except that "not replicated" is not available yet
+      keepSender:
+        # For the sender, keep any snapshot NOT prefixed with ctz-.
+        # These regexes are treated as "match" rather than "find", i.e. full string rather than substring
+        - type: regex
+          regex: ctz-.*
+          negate: true
+        # For snapshots beginning with ctz-, keep the last 3
+        - type: lastN
+          count: 3
+          regex: ctz-.*
+      keepReceiver:
+          # For the receiver, also keep any snapshot not prefixed with ctz-
+        - type: regex
+          regex: ctz-.*
+          negate: true
+        # Keep the last 1h, three snapshots spaced at least 3 hours apart, three at least a day apart, etc
+        - type: grid
+          grid: 1x1h(keep=all) | 3x3h | 3x1d | 2x14d | 2x30d | 1x90d
+          regex: ctz-.*

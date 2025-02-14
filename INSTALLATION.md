@@ -5,14 +5,23 @@ Prerequisites:
 
 ```shell
 # You need the header files for librados and librbd
-# (as root/sudo)
+# as root/sudo:
 apt install librados-dev librbd-dev 
-# Clone and build the app (normal user)
+# Clone and build the app. Alternatively, download the zip (see below).
 git clone https://github.com/mattventura/ceph-to-zfs.git
 cd ceph-to-zfs
 go build -o ./ctz ./pkg/ctz/cmd
 # Check that it built correctly
 ./ctz --help
+```
+
+Alternatively, if you do not wish to install git, you can use the github ZIP file instead:
+
+```shell
+# wget or curl the file
+wget https://github.com/mattventura/ceph-to-zfs/archive/refs/heads/master.zip -O ctz.zip
+unzip ctz.zip
+cd ceph-to-zfs-master/
 ```
 
 # ZFS Configuration
@@ -21,8 +30,11 @@ You will need to ensure that the user you wish to run CTZ as has adequate permis
 plan to use for backups.
 
 ```shell
-# TODO check if there are any others that are needed
-zfs allow backupuser create,mount,rollback,snapshot tank/ceph-backups
+# Create dataset if needed
+zfs create tank/ceph-backups
+# If using a different user for CTZ, grant that user adequate permissions
+# Permissions for RBD
+zfs allow backupuser create,destroy,rollback,snapshot tank/ceph-backups
 ```
 
 # CTZ Configuration

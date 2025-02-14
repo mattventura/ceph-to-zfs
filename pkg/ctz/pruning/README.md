@@ -1,0 +1,1 @@
+This package is mostly copied from Zrepl, with minor adaptations, such as using go-yaml.

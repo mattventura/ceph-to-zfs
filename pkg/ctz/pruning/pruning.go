@@ -29,13 +29,16 @@ type PruneKeepLastN struct {
 	Regex string `yaml:"regex"`
 }
 
-type PruneKeepRegex struct { // FIXME rename to KeepRegex
+type PruneKeepRegex struct {
 	Type   string `yaml:"type"`
 	Regex  string `yaml:"regex"`
-	Negate bool   `yaml:"negate,default=false"`
+	Negate bool   `yaml:"negate"`
 }
 
 // TODO: this is implementing the "obsoleteUnmarshaler" interface
+// But I had some issues trying to get it to use the new-style Marshaller
+// This code is from Zrepl and the original code uses a custom yaml library
+
 func (t *PruningEnum) UnmarshalYAML(u func(interface{}) error) (err error) {
 	t.Ret, err = enumUnmarshalOld(u, map[string]interface{}{
 		"lastN": &PruneKeepLastN{},

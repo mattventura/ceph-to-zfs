@@ -150,7 +150,7 @@ func (t *ImageBackupTask) run() error {
 	}
 	//// Also check block size
 	// XXX this doesn't work - object size != block size
-	//blockSize, err := cephImage.BlockSize()
+	//blockSize, err := cephImage.ObjSize()
 	//if err != nil {
 	//	return err
 	//}

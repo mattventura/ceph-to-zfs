@@ -1,6 +1,7 @@
 package cephsupport
 
 import (
+	"fmt"
 	"github.com/ceph/go-ceph/rados"
 	"github.com/ceph/go-ceph/rbd"
 	"github.com/mattventura/ceph-to-zfs/pkg/ctz/config"
@@ -62,7 +63,7 @@ func (i *CephImageView) SnapAndActivate(snapName string) error {
 	return nil
 }
 
-func (i *CephImageView) BlockSize() (uint64, error) {
+func (i *CephImageView) ObjSize() (uint64, error) {
 	stat, err := i.image.Stat()
 	if err != nil {
 		return 0, err
@@ -98,9 +99,16 @@ func (i *CephImageView) Read(offset uint64, length uint64) ([]byte, error) {
 
 func (i *CephImageView) DeleteSnapshot(snap *models.CephSnapshot) error {
 	snapshot := i.image.GetSnapshot(snap.Name())
-	err := snapshot.Remove()
+	protected, err := snapshot.IsProtected()
 	if err != nil {
-		return util.WrapFmt(err, "error deleting snapshot %s", snap.Name())
+		return util.WrapFmt(err, "error checking if snapshot %s is protected", snap.Name())
+	}
+	if protected {
+		return fmt.Errorf("snapshot %s is protected - cannot delete", snap.Name())
+	}
+	err = snapshot.Remove()
+	if err != nil {
+		return util.WrapFmt(err, "error deleting ceph snapshot %s", snap.Name())
 	}
 	return nil
 }
