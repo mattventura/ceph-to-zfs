@@ -12,12 +12,12 @@ import (
 // KeepGrid fits snapshots that match a given regex into a retentiongrid.Grid,
 // uses the most recent snapshot among those that match the regex as 'now',
 // and deletes all snapshots that do not fit the grid specification.
-type KeepGrid struct {
+type KeepGrid[T models.Snapshot] struct {
 	retentionGrid *retentiongrid.Grid
 	re            *regexp.Regexp
 }
 
-func NewKeepGrid(in *PruneGrid) (p *KeepGrid, err error) {
+func NewKeepGrid[T models.Snapshot](in *PruneGrid) (p *KeepGrid[T], err error) {
 
 	if in.Regex == "" {
 		return nil, fmt.Errorf("Regex must not be empty")
@@ -27,10 +27,10 @@ func NewKeepGrid(in *PruneGrid) (p *KeepGrid, err error) {
 		return nil, errors.Wrap(err, "Regex is invalid")
 	}
 
-	return newKeepGrid(re, in.Grid)
+	return newKeepGrid[T](re, in.Grid)
 }
 
-func MustNewKeepGrid(regex, gridspec string) *KeepGrid {
+func MustNewKeepGrid[T models.Snapshot](regex, gridspec string) *KeepGrid[T] {
 
 	ris, err := ParseRetentionIntervalSpec(gridspec)
 	if err != nil {
@@ -39,14 +39,14 @@ func MustNewKeepGrid(regex, gridspec string) *KeepGrid {
 
 	re := regexp.MustCompile(regex)
 
-	grid, err := newKeepGrid(re, ris)
+	grid, err := newKeepGrid[T](re, ris)
 	if err != nil {
 		panic(err)
 	}
 	return grid
 }
 
-func newKeepGrid(re *regexp.Regexp, configIntervals []RetentionInterval) (*KeepGrid, error) {
+func newKeepGrid[T models.Snapshot](re *regexp.Regexp, configIntervals []RetentionInterval) (*KeepGrid[T], error) {
 	if re == nil {
 		panic("re must not be nil")
 	}
@@ -79,16 +79,16 @@ func newKeepGrid(re *regexp.Regexp, configIntervals []RetentionInterval) (*KeepG
 		lastDuration = intervals[i].Length()
 	}
 
-	return &KeepGrid{
+	return &KeepGrid[T]{
 		retentionGrid: retentiongrid.NewGrid(intervals),
 		re:            re,
 	}, nil
 }
 
 // Prune filters snapshots with the retention grid.
-func (p *KeepGrid) KeepRule(snaps []models.Snapshot) (destroyList []models.Snapshot) {
+func (p *KeepGrid[T]) KeepRule(snaps []T) (destroyList []T) {
 
-	matching, notMatching := partitionSnapList(snaps, func(snapshot models.Snapshot) bool {
+	matching, notMatching := partitionSnapList(snaps, func(snapshot T) bool {
 		return p.re.MatchString(snapshot.Name())
 	})
 
@@ -108,7 +108,7 @@ func (p *KeepGrid) KeepRule(snaps []models.Snapshot) (destroyList []models.Snaps
 
 	// Revert adaptors
 	for i := range gridDestroyList {
-		destroyList = append(destroyList, gridDestroyList[i].(models.Snapshot))
+		destroyList = append(destroyList, gridDestroyList[i].(T))
 	}
 	return destroyList
 }

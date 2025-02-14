@@ -3,8 +3,11 @@ package builder
 import (
 	"errors"
 	"fmt"
+	"github.com/adhocore/gronx"
 	"github.com/mattventura/ceph-to-zfs/pkg/ctz/config"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/models"
 	"github.com/mattventura/ceph-to-zfs/pkg/ctz/pruning"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/zfssupport"
 	"gopkg.in/yaml.v3"
 	"os"
 	"regexp"
@@ -41,7 +44,7 @@ func FromYamlFile(path string) (*config.TopLevelProcessedConfig, error) {
 			cluster.ClusterName = config.DefaultClusterConfig.ClusterName
 		}
 	}
-	var jobs []*config.PoolJobProcessedConfig
+	var jobs []*config.RbdPoolJobProcessedConfig
 	jobIds := make(map[string]bool)
 	for i, rawJob := range rawConfig.Jobs {
 		clusterKey := rawJob.Cluster
@@ -95,21 +98,31 @@ func FromYamlFile(path string) (*config.TopLevelProcessedConfig, error) {
 			conc = config.DEFAULT_MAX_CONC
 		}
 
-		var prune pruning.Pruning
+		var srcPrune pruning.Pruner[*models.CephSnapshot]
+		var rcvPrune pruning.Pruner[*zfssupport.ZvolSnapshot]
 		if rawJob.Pruning != nil {
-			sender, err := pruning.RulesFromConfig(rawJob.Pruning.KeepSender)
+			srcRules, err := pruning.RulesFromConfig[*models.CephSnapshot](rawJob.Pruning.KeepSender)
 			if err != nil {
 				return nil, err
 			}
-			receiver, err := pruning.RulesFromConfig(rawJob.Pruning.KeepReceiver)
+			srcPrune = pruning.NewPruner[*models.CephSnapshot](srcRules)
+			rcvRules, err := pruning.RulesFromConfig[*zfssupport.ZvolSnapshot](rawJob.Pruning.KeepReceiver)
 			if err != nil {
 				return nil, err
 			}
-			prune = pruning.NewPruner(sender, receiver)
+			rcvPrune = pruning.NewPruner[*zfssupport.ZvolSnapshot](rcvRules)
+
 		} else {
-			prune = pruning.NoPruner()
+			srcPrune = pruning.NoPruner[*models.CephSnapshot]()
+			rcvPrune = pruning.NoPruner[*zfssupport.ZvolSnapshot]()
 		}
-		job := &config.PoolJobProcessedConfig{
+		if rawJob.Cron != nil {
+			valid := gronx.IsValid(*rawJob.Cron)
+			if !valid {
+				return nil, errors.New(fmt.Sprintf("cron is invalid (%v)", rawJob.Cron))
+			}
+		}
+		job := &config.RbdPoolJobProcessedConfig{
 			Id:                rawJob.Id,
 			Label:             rawJob.Label,
 			ClusterConfig:     clusterConfig,
@@ -118,7 +131,9 @@ func FromYamlFile(path string) (*config.TopLevelProcessedConfig, error) {
 			ImageIncludeRegex: include,
 			ImageExcludeRegex: exclude,
 			MaxConcurrency:    conc,
-			Pruning:           prune,
+			SrcPruning:        srcPrune,
+			RcvPruning:        rcvPrune,
+			Cron:              rawJob.Cron,
 		}
 		jobs = append(jobs, job)
 	}

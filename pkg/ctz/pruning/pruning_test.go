@@ -23,9 +23,9 @@ func (s stubSnap) Replicated() bool { return s.replicated }
 
 func (s stubSnap) When() time.Time { return s.date }
 
-type testCase struct {
-	inputs     []models.Snapshot
-	rules      []KeepRule
+type testCase[T models.Snapshot] struct {
+	inputs     []T
+	rules      []KeepRule[T]
 	expDestroy map[string]bool
 }
 
@@ -48,11 +48,11 @@ func (l snapshotList) NameList() []string {
 	return res
 }
 
-func testTable(tcs map[string]testCase, t *testing.T) {
+func testTable[T models.Snapshot](tcs map[string]testCase[T], t *testing.T) {
 	for name := range tcs {
 		t.Run(name, func(t *testing.T) {
 			tc := tcs[name]
-			destroyList := PruneSnapshots(tc.inputs, tc.rules)
+			destroyList := PruneSnapshots[T](tc.inputs, tc.rules)
 			destroySet := make(map[string]bool, len(destroyList))
 			for _, s := range destroyList {
 				destroySet[s.Name()] = true
@@ -82,11 +82,11 @@ func TestPruneSnapshots(t *testing.T) {
 		return time.Unix(secs, 0)
 	}
 
-	tcs := map[string]testCase{
+	tcs := map[string]testCase[models.Snapshot]{
 		"simple": {
 			inputs: inputs["s1"],
-			rules: []KeepRule{
-				MustKeepRegex("foo_", false),
+			rules: []KeepRule[models.Snapshot]{
+				MustKeepRegex[models.Snapshot]("foo_", false),
 			},
 			expDestroy: map[string]bool{
 				"bar_123": true,
@@ -94,17 +94,17 @@ func TestPruneSnapshots(t *testing.T) {
 		},
 		"multipleRules": {
 			inputs: inputs["s1"],
-			rules: []KeepRule{
-				MustKeepRegex("foo_", false),
-				MustKeepRegex("bar_", false),
+			rules: []KeepRule[models.Snapshot]{
+				MustKeepRegex[models.Snapshot]("foo_", false),
+				MustKeepRegex[models.Snapshot]("bar_", false),
 			},
 			expDestroy: map[string]bool{},
 		},
 		"onlyThoseRemovedByAllAreRemoved": {
 			inputs: inputs["s1"],
-			rules: []KeepRule{
-				MustKeepRegex("notInS1", false), // would remove all
-				MustKeepRegex("bar_", false),    // would remove all but bar_, i.e. foo_.*
+			rules: []KeepRule[models.Snapshot]{
+				MustKeepRegex[models.Snapshot]("notInS1", false), // would remove all
+				MustKeepRegex[models.Snapshot]("bar_", false),    // would remove all but bar_, i.e. foo_.*
 			},
 			expDestroy: map[string]bool{
 				"foo_123": true,
@@ -113,7 +113,7 @@ func TestPruneSnapshots(t *testing.T) {
 		},
 		"noRulesKeepsAll": {
 			inputs:     inputs["s1"],
-			rules:      []KeepRule{},
+			rules:      []KeepRule[models.Snapshot]{},
 			expDestroy: map[string]bool{},
 		},
 		"nilRulesKeepsAll": {
@@ -123,8 +123,8 @@ func TestPruneSnapshots(t *testing.T) {
 		},
 		"noSnaps": {
 			inputs: []models.Snapshot{},
-			rules: []KeepRule{
-				MustKeepRegex("foo_", false),
+			rules: []KeepRule[models.Snapshot]{
+				MustKeepRegex[models.Snapshot]("foo_", false),
 			},
 			expDestroy: map[string]bool{},
 		},
@@ -137,7 +137,7 @@ func TestPruneSnapshots(t *testing.T) {
 				stubSnap{"p1_c", false, reltime(29)},
 				stubSnap{"p2_c", false, reltime(30)},
 			},
-			rules: []KeepRule{
+			rules: []KeepRule[models.Snapshot]{
 				MustNewKeepGrid("^p1_", `1x10s | 1x10s`),
 				MustNewKeepGrid("^p2_", `1x10s | 1x10s`),
 			},
@@ -148,5 +148,5 @@ func TestPruneSnapshots(t *testing.T) {
 		},
 	}
 
-	testTable(tcs, t)
+	testTable[T](tcs, t)
 }

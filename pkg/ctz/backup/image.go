@@ -25,11 +25,12 @@ import (
 	"unsafe"
 )
 
-// ImageBackupTask represents the backup process for a single image
+// ImageBackupTask represents the backup process for a single image (one RBD image to one ZVOL)
 type ImageBackupTask struct {
 	imageName  string
 	cephConfig *config.CephClusterConfig
-	pruner     pruning.Pruning
+	srcPruner  pruning.Pruner[*models.CephSnapshot]
+	rcvPruner  pruning.Pruner[*zfssupport.ZvolSnapshot]
 	poolName   string
 	ioctx      *rados.IOContext
 	zfsContext *zfssupport.ZfsContext
@@ -44,7 +45,14 @@ type finalData struct {
 	bytesTrimmed    uint64
 }
 
-func NewImageBackupTask(imageName string, cephConfig *config.CephClusterConfig, poolname string, zfsContext *zfssupport.ZfsContext, parentLog *logging.JobStatusLogger, pruner pruning.Pruning) *ImageBackupTask {
+func NewImageBackupTask(
+	imageName string,
+	cephConfig *config.CephClusterConfig,
+	poolname string,
+	zfsContext *zfssupport.ZfsContext,
+	parentLog *logging.JobStatusLogger,
+	jobConfig *config.RbdPoolJobProcessedConfig,
+) *ImageBackupTask {
 	log := parentLog.MakeOrReplaceChild(logging.LoggerKey(imageName), true)
 	out := &ImageBackupTask{
 		imageName: imageName,
@@ -53,7 +61,8 @@ func NewImageBackupTask(imageName string, cephConfig *config.CephClusterConfig, 
 		poolName:   poolname,
 		zfsContext: zfsContext,
 		log:        log,
-		pruner:     pruner,
+		srcPruner:  jobConfig.SrcPruning,
+		rcvPruner:  jobConfig.RcvPruning,
 	}
 	out.mt = task.NewManagedTask(log, out.reset, out.run)
 	return out
@@ -64,7 +73,6 @@ func (t *ImageBackupTask) StatusLog() *logging.JobStatusLogger {
 }
 
 // No children
-// TODO: maybe represent individual parts of the process as children?
 func (t *ImageBackupTask) Children() []task.Task {
 	return nil
 }
@@ -290,48 +298,66 @@ func (t *ImageBackupTask) run() error {
 	if err != nil {
 		return util.Wrap("error creating snapshot", err)
 	}
-	t.log.SetStatus(status.MakeStatus(status.Finishing, "Preparing to prune sender snapshots"))
+	t.log.SetStatus(status.MakeStatus(status.Finishing, "Planning snapshot pruning"))
 	cephSnaps, err := cephImage.Snapshots()
 	if err != nil {
 		return err
 	}
-	var _ models.Snapshot = cephSnaps[0]
-	srcDestroy := t.pruner.DestroySender(util.Map(cephSnaps, func(in *cephsupport.CephSnapshot) models.Snapshot { return in }))
+	srcDestroy := t.srcPruner.Destroy(cephSnaps)
 	srcSnaps := len(cephSnaps)
 	srcToDestroy := len(srcDestroy)
 	srcToKeep := srcSnaps - srcToDestroy
 	t.log.SetExtraData("srcSnaps", srcSnaps)
 	t.log.SetExtraData("srcSnapsToDestroy", srcToDestroy)
 	t.log.SetExtraData("srcSnapsToKeep", srcToKeep)
-	t.log.SetStatus(status.MakeStatus(status.Finishing, fmt.Sprintf("Pruning %v ceph snapshots", srcToDestroy)))
-	for _, snapshot := range srcDestroy {
-		t.log.Log("Pruning ceph snapshot %v", snapshot.Name())
-	}
-	t.log.SetStatus(status.MakeStatus(status.Finishing, fmt.Sprintf("Pruned %v ceph snapshots", srcToDestroy)))
 
-	t.log.SetStatus(status.MakeStatus(status.Finishing, "Preparing to prune receiver snapshots"))
 	// Refresh the list so that it includes our new snapshots
 	zvolSnaps, err = zv.Snapshots()
 	if err != nil {
 		return err
 	}
-	rcvDestroy := t.pruner.DestroyReceiver(util.Map(zvolSnaps, func(in *zfssupport.ZvolSnapshot) models.Snapshot { return in }))
+	rcvDestroy := t.rcvPruner.Destroy(zvolSnaps)
 	rcvSnaps := len(rcvDestroy)
 	rcvToDestroy := len(rcvDestroy)
 	rcvToKeep := rcvSnaps - rcvToDestroy
 	t.log.SetExtraData("rcvSnaps", rcvSnaps)
 	t.log.SetExtraData("rcvSnapsToDestroy", rcvToDestroy)
 	t.log.SetExtraData("rcvSnapsToKeep", rcvToKeep)
-	t.log.SetStatus(status.MakeStatus(status.Finishing, fmt.Sprintf("Pruning %v ceph snapshots", rcvToDestroy)))
-	for _, snapshot := range rcvDestroy {
-		t.log.Log("Pruning ZFS snapshot %v", snapshot.Name())
-	}
-	t.log.SetStatus(status.MakeStatus(status.Finishing, fmt.Sprintf("Pruned %v ceph snapshots", rcvToDestroy)))
 
 	snapReport := t.makeSnapshotReport(cephSnaps, srcDestroy, zvolSnaps, rcvDestroy)
-	t.log.SetSeparateData("snapshotReport", snapReport)
+	t.log.SetDetailData("snapshotReport", snapReport)
 	for _, snapshot := range snapReport.Snapshots {
 		t.log.Log(snapshot.String())
+	}
+
+	t.log.SetStatus(status.MakeStatus(status.Finishing, fmt.Sprintf("Pruning %v ceph snapshots", srcToDestroy)))
+	pruneErrors := []error{}
+	cephPruned := 0
+	for _, snapshot := range srcDestroy {
+		t.log.Log("Pruning ceph snapshot %v", snapshot.Name())
+		err := cephImage.DeleteSnapshot(snapshot)
+		if err != nil {
+			pruneErrors = append(pruneErrors, err)
+		} else {
+			cephPruned++
+		}
+	}
+	t.log.SetStatus(status.MakeStatus(status.Finishing, fmt.Sprintf("Pruned %v ceph snapshots", cephPruned)))
+
+	t.log.SetStatus(status.MakeStatus(status.Finishing, fmt.Sprintf("Pruning %v ZFS snapshots", rcvToDestroy)))
+	zfsPruned := 0
+	for _, snapshot := range rcvDestroy {
+		t.log.Log("Pruning ZFS snapshot %v", snapshot.Name())
+		err := zv.DeleteSnapshot(snapshot)
+		if err != nil {
+			pruneErrors = append(pruneErrors, err)
+		} else {
+			zfsPruned++
+		}
+	}
+	t.log.SetStatus(status.MakeStatus(status.Finishing, fmt.Sprintf("Pruned %v ZFS snapshots", zfsPruned)))
+	if len(pruneErrors) > 0 {
+		return errors.Join(pruneErrors...)
 	}
 
 	t.finalData = &finalData{
@@ -415,7 +441,7 @@ func (e *SnapshotReportElement) String() string {
 //	Rcv    models.Snapshot
 //}
 
-func (t *ImageBackupTask) makeSnapshotReport(srcSnaps []*cephsupport.CephSnapshot, srcDestroy []models.Snapshot, rcvSnaps []*zfssupport.ZvolSnapshot, rcvDestroy []models.Snapshot) *SnapshotReport {
+func (t *ImageBackupTask) makeSnapshotReport(srcSnaps []*models.CephSnapshot, srcDestroy []*models.CephSnapshot, rcvSnaps []*zfssupport.ZvolSnapshot, rcvDestroy []*zfssupport.ZvolSnapshot) *SnapshotReport {
 	elements := make(map[string]*SnapshotReportElement)
 	for _, snap := range srcSnaps {
 		name := snap.Name()

@@ -27,7 +27,14 @@ func main() {
 		fmt.Println("Config file looks valid")
 		os.Exit(0)
 	}
-	task := backup.NewTopLevelTask(cfg)
+	if *oneShot {
+		cfg.Globals.DisableAllCron = true
+	}
+	task, err := backup.NewTopLevelTask(cfg)
+	if err != nil {
+		fmt.Printf("Error creating top level task: %v\n", err)
+		os.Exit(1)
+	}
 	if *webEnable {
 		err := web.StartWebInterface(task, *webPort)
 		if err != nil {

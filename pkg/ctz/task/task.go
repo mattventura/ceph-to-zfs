@@ -42,6 +42,7 @@ func NewManagedTask(logger *logging.JobStatusLogger, prepFunc func() error, task
 }
 
 func (mt *ManagedTask) doPrep() error {
+	mt.log.ResetData()
 	mt.log.SetSimpleStatus(status.Preparing)
 	err := mt.prepFunc()
 	if err != nil {
@@ -53,7 +54,6 @@ func (mt *ManagedTask) doPrep() error {
 }
 
 func (mt *ManagedTask) Prepare() (err error) {
-	mt.log.ResetData()
 	defer func() {
 		if err != nil {
 			mt.log.SetStatus(status.MakeStatus(status.Failed, err.Error()))

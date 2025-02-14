@@ -1,7 +1,9 @@
 package config
 
 import (
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/models"
 	"github.com/mattventura/ceph-to-zfs/pkg/ctz/pruning"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/zfssupport"
 	"regexp"
 )
 
@@ -9,11 +11,16 @@ const DEFAULT_MAX_CONC = 2
 
 type TopLevelRawConfig struct {
 	Clusters map[string]*CephClusterConfig `yaml:"clusters" binding:"required"`
-	Jobs     []*PoolJobRawConfig           `yaml:"jobs" binding:"required"`
+	Jobs     []*RbdPoolJobRawConfig        `yaml:"jobs" binding:"required"`
 }
 
 type TopLevelProcessedConfig struct {
-	Jobs []*PoolJobProcessedConfig
+	Jobs    []*RbdPoolJobProcessedConfig
+	Globals GlobalProcessedConfig
+}
+
+type GlobalProcessedConfig struct {
+	DisableAllCron bool
 }
 
 type CephClusterConfig struct {
@@ -28,7 +35,7 @@ var DefaultClusterConfig = &CephClusterConfig{
 	ClusterName: "ceph",
 }
 
-type PoolJobRawConfig struct {
+type RbdPoolJobRawConfig struct {
 	Id                string      `yaml:"id" binding:"required"`
 	Label             string      `yaml:"label" binding:"required"`
 	Cluster           string      `yaml:"cluster" binding:"required"`
@@ -38,6 +45,7 @@ type PoolJobRawConfig struct {
 	ImageExcludeRegex string      `yaml:"imageExcludeRegex" binding:"required"`
 	MaxConcurrency    *int        `yaml:"maxConcurrency" binding:"required"`
 	Pruning           *PruningRaw `yaml:"pruning"`
+	Cron              *string     `yaml:"cron""`
 }
 
 type PruningRaw struct {
@@ -45,7 +53,7 @@ type PruningRaw struct {
 	KeepReceiver []pruning.PruningEnum `yaml:"keepReceiver"`
 }
 
-type PoolJobProcessedConfig struct {
+type RbdPoolJobProcessedConfig struct {
 	Id                string
 	Label             string
 	ClusterConfig     *CephClusterConfig
@@ -54,5 +62,7 @@ type PoolJobProcessedConfig struct {
 	ImageIncludeRegex *regexp.Regexp
 	ImageExcludeRegex *regexp.Regexp
 	MaxConcurrency    int
-	Pruning           pruning.Pruning
+	SrcPruning        pruning.Pruner[*models.CephSnapshot]
+	RcvPruning        pruning.Pruner[*zfssupport.ZvolSnapshot]
+	Cron              *string
 }

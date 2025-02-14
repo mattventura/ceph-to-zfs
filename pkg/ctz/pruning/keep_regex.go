@@ -5,31 +5,31 @@ import (
 	"regexp"
 )
 
-type KeepRegex struct {
+type KeepRegex[T models.Snapshot] struct {
 	expr   *regexp.Regexp
 	negate bool
 }
 
-var _ KeepRule = &KeepRegex{}
+var _ KeepRule[models.Snapshot] = &KeepRegex[models.Snapshot]{}
 
-func NewKeepRegex(expr string, negate bool) (*KeepRegex, error) {
+func NewKeepRegex[T models.Snapshot](expr string, negate bool) (*KeepRegex[T], error) {
 	re, err := regexp.Compile(expr)
 	if err != nil {
 		return nil, err
 	}
-	return &KeepRegex{re, negate}, nil
+	return &KeepRegex[T]{re, negate}, nil
 }
 
-func MustKeepRegex(expr string, negate bool) *KeepRegex {
-	k, err := NewKeepRegex(expr, negate)
+func MustKeepRegex[T models.Snapshot](expr string, negate bool) *KeepRegex[T] {
+	k, err := NewKeepRegex[T](expr, negate)
 	if err != nil {
 		panic(err)
 	}
 	return k
 }
 
-func (k *KeepRegex) KeepRule(snaps []models.Snapshot) []models.Snapshot {
-	return filterSnapList(snaps, func(s models.Snapshot) bool {
+func (k *KeepRegex[T]) KeepRule(snaps []T) []T {
+	return filterSnapList(snaps, func(s T) bool {
 		if k.negate {
 			return k.expr.FindStringIndex(s.Name()) != nil
 		} else {

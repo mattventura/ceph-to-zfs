@@ -92,10 +92,10 @@ func enumUnmarshalOld(u func(interface{}) error, types map[string]interface{}) (
 }
 
 // The returned snapshot list is guaranteed to only contains elements of input parameter snaps
-func PruneSnapshots(snaps []models.Snapshot, keepRules []KeepRule) []models.Snapshot {
+func PruneSnapshots[T models.Snapshot](snaps []T, keepRules []KeepRule[T]) []T {
 
 	if len(keepRules) == 0 {
-		return []models.Snapshot{}
+		return []T{}
 	}
 
 	remCount := make(map[models.Snapshot]int, len(snaps))
@@ -106,20 +106,20 @@ func PruneSnapshots(snaps []models.Snapshot, keepRules []KeepRule) []models.Snap
 		}
 	}
 
-	remove := make([]models.Snapshot, 0, len(snaps))
+	remove := make([]T, 0, len(snaps))
 	for snap, rc := range remCount {
 		if rc == len(keepRules) {
-			remove = append(remove, snap)
+			remove = append(remove, snap.(T))
 		}
 	}
 
 	return remove
 }
 
-func RulesFromConfig(in []PruningEnum) (rules []KeepRule, err error) {
-	rules = make([]KeepRule, len(in))
+func RulesFromConfig[T models.Snapshot](in []PruningEnum) (rules []KeepRule[T], err error) {
+	rules = make([]KeepRule[T], len(in))
 	for i := range in {
-		rules[i], err = RuleFromConfig(in[i])
+		rules[i], err = RuleFromConfig[T](in[i])
 		if err != nil {
 			return nil, errors.Wrapf(err, "cannot build rule #%d", i)
 		}
@@ -127,60 +127,50 @@ func RulesFromConfig(in []PruningEnum) (rules []KeepRule, err error) {
 	return rules, nil
 }
 
-func RuleFromConfig(in PruningEnum) (KeepRule, error) {
+func RuleFromConfig[T models.Snapshot](in PruningEnum) (KeepRule[T], error) {
 	switch v := in.Ret.(type) {
 	case *PruneKeepLastN:
-		return NewKeepLastN(v.Count, v.Regex)
+		return NewKeepLastN[T](v.Count, v.Regex)
 	case *PruneKeepRegex:
-		return NewKeepRegex(v.Regex, v.Negate)
+		return NewKeepRegex[T](v.Regex, v.Negate)
 	case *PruneGrid:
-		return NewKeepGrid(v)
+		return NewKeepGrid[T](v)
 	default:
 		return nil, fmt.Errorf("unknown keep rule type %T", v)
 	}
 }
 
-type KeepRule interface {
-	KeepRule(snaps []models.Snapshot) (destroyList []models.Snapshot)
+type KeepRule[T models.Snapshot] interface {
+	KeepRule(snaps []T) (destroyList []T)
 }
 
-type Pruning interface {
-	DestroySender(snapshots []models.Snapshot) []models.Snapshot
-	DestroyReceiver(snapshots []models.Snapshot) []models.Snapshot
+type Pruner[T models.Snapshot] interface {
+	Destroy(snapshots []T) []T
 }
 
-type pruner struct {
-	srcRules []KeepRule
-	rcvRules []KeepRule
+type pruner[T models.Snapshot] struct {
+	rules []KeepRule[T]
 }
 
-var _ Pruning = &pruner{}
-
-func (p *pruner) DestroySender(snapshots []models.Snapshot) []models.Snapshot {
-	return PruneSnapshots(snapshots, p.srcRules)
+func (p *pruner[T]) Destroy(snapshots []T) []T {
+	return PruneSnapshots(snapshots, p.rules)
 }
 
-func (p *pruner) DestroyReceiver(snapshots []models.Snapshot) []models.Snapshot {
-	return PruneSnapshots(snapshots, p.rcvRules)
+var _ Pruner[models.Snapshot] = &pruner[models.Snapshot]{}
+
+func NewPruner[T models.Snapshot](rules []KeepRule[T]) Pruner[T] {
+	return &pruner[T]{rules: rules}
 }
 
-func NewPruner(srcRules []KeepRule, rcvRules []KeepRule) Pruning {
-	return &pruner{srcRules: srcRules, rcvRules: rcvRules}
+type noopPruner[T models.Snapshot] struct {
 }
 
-type noopPruner struct {
+func (n *noopPruner[T]) Destroy(snapshots []T) []T {
+	return []T{}
 }
 
-var _ Pruning = &noopPruner{}
+var _ Pruner[models.Snapshot] = &noopPruner[models.Snapshot]{}
 
-func (n *noopPruner) DestroySender(snapshots []models.Snapshot) []models.Snapshot {
-	return []models.Snapshot{}
-}
-
-func (n *noopPruner) DestroyReceiver(snapshots []models.Snapshot) []models.Snapshot {
-	return []models.Snapshot{}
-}
-
-func NoPruner() Pruning {
-	return &noopPruner{}
+func NoPruner[T models.Snapshot]() Pruner[T] {
+	return &noopPruner[T]{}
 }

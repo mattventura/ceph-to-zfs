@@ -9,8 +9,8 @@ import (
 
 func TestKeepRegexNegation(t *testing.T) {
 
-	noneg := MustKeepRegex("^zrepl_", false)
-	neg := MustKeepRegex("^zrepl_", true)
+	noneg := MustKeepRegex[models.Snapshot]("^zrepl_", false)
+	neg := MustKeepRegex[models.Snapshot]("^zrepl_", true)
 
 	snaps := []models.Snapshot{
 		stubSnap{name: "zrepl_foobar"},

@@ -92,6 +92,11 @@ func (z *ZvolDestination) NewSnapshot(name string) (*zfs.Dataset, error) {
 	return snapshot, nil
 }
 
+func (z *ZvolDestination) DeleteSnapshot(snap *ZvolSnapshot) error {
+	err := snap.Dataset().Destroy(0)
+	return err
+}
+
 type ZfsContext struct {
 	baseDataset *zfs.Dataset
 }

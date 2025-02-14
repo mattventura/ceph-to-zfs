@@ -9,24 +9,10 @@ import (
 	"time"
 )
 
+// CephImageView is a wrapper over an RBD image.
 type CephImageView struct {
 	image *rbd.Image
 }
-
-type CephSnapshot struct {
-	name string
-	when time.Time
-}
-
-func (c *CephSnapshot) Name() string {
-	return c.name
-}
-
-func (c *CephSnapshot) When() time.Time {
-	return c.when
-}
-
-var _ models.Snapshot = &CephSnapshot{}
 
 func (i *CephImageView) Name() string {
 	return i.image.GetName()
@@ -47,22 +33,19 @@ func (i *CephImageView) SnapNames() ([]string, error) {
 	return snapNames, nil
 }
 
-func (i *CephImageView) Snapshots() ([]*CephSnapshot, error) {
+func (i *CephImageView) Snapshots() ([]*models.CephSnapshot, error) {
 	snaps, err := i.image.GetSnapshotNames()
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*CephSnapshot, len(snaps))
+	out := make([]*models.CephSnapshot, len(snaps))
 	// TODO: this is slow to do in serial
 	for j, snap := range snaps {
 		timestamp, err := i.image.GetSnapTimestamp(snap.Id)
 		if err != nil {
 			return nil, err
 		}
-		out[j] = &CephSnapshot{
-			name: snap.Name,
-			when: time.Unix(timestamp.Sec, timestamp.Nsec),
-		}
+		out[j] = models.NewCephSnapshot(snap.Name, time.Unix(timestamp.Sec, timestamp.Nsec), snap.Id)
 	}
 	return out, nil
 }
@@ -111,6 +94,15 @@ func (i *CephImageView) Read(offset uint64, length uint64) ([]byte, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+func (i *CephImageView) DeleteSnapshot(snap *models.CephSnapshot) error {
+	snapshot := i.image.GetSnapshot(snap.Name())
+	err := snapshot.Remove()
+	if err != nil {
+		return util.WrapFmt(err, "error deleting snapshot %s", snap.Name())
+	}
+	return nil
 }
 
 func NewCephImageView(image *rbd.Image) *CephImageView {

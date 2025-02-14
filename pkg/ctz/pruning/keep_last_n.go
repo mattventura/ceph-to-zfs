@@ -9,22 +9,22 @@ import (
 	"github.com/pkg/errors"
 )
 
-type KeepLastN struct {
+type KeepLastN[T models.Snapshot] struct {
 	n  int
 	re *regexp.Regexp
 }
 
-var _ KeepRule = &KeepLastN{}
+var _ KeepRule[models.Snapshot] = &KeepLastN[models.Snapshot]{}
 
-func MustKeepLastN(n int, regex string) *KeepLastN {
-	k, err := NewKeepLastN(n, regex)
+func MustKeepLastN[T models.Snapshot](n int, regex string) *KeepLastN[T] {
+	k, err := NewKeepLastN[T](n, regex)
 	if err != nil {
 		panic(err)
 	}
 	return k
 }
 
-func NewKeepLastN(n int, regex string) (*KeepLastN, error) {
+func NewKeepLastN[T models.Snapshot](n int, regex string) (*KeepLastN[T], error) {
 	if n <= 0 {
 		return nil, errors.Errorf("must specify positive number as 'keep last count', got %d", n)
 	}
@@ -32,11 +32,11 @@ func NewKeepLastN(n int, regex string) (*KeepLastN, error) {
 	if err != nil {
 		return nil, errors.Errorf("invalid regex %q: %s", regex, err)
 	}
-	return &KeepLastN{n, re}, nil
+	return &KeepLastN[T]{n, re}, nil
 }
 
-func (k KeepLastN) KeepRule(snaps []models.Snapshot) (destroyList []models.Snapshot) {
-	matching, notMatching := partitionSnapList(snaps, func(snapshot models.Snapshot) bool {
+func (k KeepLastN[T]) KeepRule(snaps []T) (destroyList []T) {
+	matching, notMatching := partitionSnapList(snaps, func(snapshot T) bool {
 		return k.re.MatchString(snapshot.Name())
 	})
 	// snaps that don't match the regex are not kept by this rule

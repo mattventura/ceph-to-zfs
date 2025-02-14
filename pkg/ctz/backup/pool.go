@@ -16,9 +16,11 @@ import (
 	"sync"
 )
 
-type PoolBackupTask struct {
+// RbdPoolBackupTask is responsible for backing up an entire RBD pool. Each image within the pool gets its own
+// ImageBackupTask
+type RbdPoolBackupTask struct {
 	cephConfig *config.CephClusterConfig
-	jobConfig  *config.PoolJobProcessedConfig
+	jobConfig  *config.RbdPoolJobProcessedConfig
 	poolName   string
 	log        *logging.JobStatusLogger
 	children   []*ImageBackupTask
@@ -26,12 +28,12 @@ type PoolBackupTask struct {
 	mt         *task.ManagedTask
 }
 
-func NewPoolBackupTask(
-	jobConfig *config.PoolJobProcessedConfig,
+func NewRbdPoolBackupTask(
+	jobConfig *config.RbdPoolJobProcessedConfig,
 	parentLog *logging.JobStatusLogger,
-) *PoolBackupTask {
+) *RbdPoolBackupTask {
 	log := parentLog.MakeOrReplaceChild(logging.LoggerKey(jobConfig.Id), false)
-	out := &PoolBackupTask{
+	out := &RbdPoolBackupTask{
 		cephConfig: jobConfig.ClusterConfig,
 		jobConfig:  jobConfig,
 		poolName:   jobConfig.CephPoolName,
@@ -40,20 +42,23 @@ func NewPoolBackupTask(
 		childMap:   map[string]*ImageBackupTask{},
 	}
 	out.mt = task.NewManagedTask(log, out.prep, out.run)
+	if jobConfig.Cron != nil {
+		log.SetFixedExtraData("cron", jobConfig.Cron)
+	}
 	return out
 }
 
-func (t *PoolBackupTask) StatusLog() *logging.JobStatusLogger {
+func (t *RbdPoolBackupTask) StatusLog() *logging.JobStatusLogger {
 	return t.log
 }
 
-func (t *PoolBackupTask) Children() []task.Task {
+func (t *RbdPoolBackupTask) Children() []task.Task {
 	return util.Map(t.children, func(in *ImageBackupTask) task.Task {
 		return in
 	})
 }
 
-func (t *PoolBackupTask) includeImage(name string) bool {
+func (t *RbdPoolBackupTask) includeImage(name string) bool {
 	j := t.jobConfig
 	if j.ImageIncludeRegex == nil {
 		return true
@@ -62,7 +67,7 @@ func (t *PoolBackupTask) includeImage(name string) bool {
 	}
 }
 
-func (t *PoolBackupTask) excludeImage(name string) bool {
+func (t *RbdPoolBackupTask) excludeImage(name string) bool {
 	j := t.jobConfig
 	if j.ImageExcludeRegex == nil {
 		return false
@@ -71,7 +76,7 @@ func (t *PoolBackupTask) excludeImage(name string) bool {
 	}
 }
 
-func (t *PoolBackupTask) shouldBackupImage(name string) bool {
+func (t *RbdPoolBackupTask) shouldBackupImage(name string) bool {
 	// if only "include" is specified, only things matching the include pattern are included
 	// if only "exclude" is specified, then only things not matching the exclude pattern are included
 	// if both are specified, then items must match the include pattern *and not* match the exclude pattern
@@ -82,7 +87,7 @@ func (t *PoolBackupTask) shouldBackupImage(name string) bool {
 }
 
 // prep contains only the
-func (t *PoolBackupTask) prep() (err error) {
+func (t *RbdPoolBackupTask) prep() (err error) {
 	t.log.SetStatus(status.MakeStatus(status.Preparing, "Connecting to Ceph Cluster"))
 	conn, err := cephsupport.Connect(t.cephConfig)
 	if err != nil {
@@ -113,7 +118,7 @@ func (t *PoolBackupTask) prep() (err error) {
 			t.log.Log("Image %v included", name)
 			tsk := t.childMap[name]
 			if tsk == nil {
-				tsk = NewImageBackupTask(name, t.cephConfig, t.poolName, zfsContext, t.log, t.jobConfig.Pruning)
+				tsk = NewImageBackupTask(name, t.cephConfig, t.poolName, zfsContext, t.log, t.jobConfig)
 				t.childMap[name] = tsk
 			}
 			children = append(children, tsk)
@@ -135,8 +140,8 @@ func (t *PoolBackupTask) prep() (err error) {
 	return nil
 }
 
-func (t *PoolBackupTask) run() (err error) {
-	// TODO: needed?
+func (t *RbdPoolBackupTask) run() (err error) {
+	// Ceph does not like it when you switch between threads
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
@@ -197,20 +202,20 @@ func (t *PoolBackupTask) run() (err error) {
 	return err
 }
 
-func (t *PoolBackupTask) Run() error {
+func (t *RbdPoolBackupTask) Run() error {
 	return t.mt.Run(nil)
 }
 
-func (t *PoolBackupTask) Prepare() (err error) {
+func (t *RbdPoolBackupTask) Prepare() (err error) {
 	return t.mt.Prepare()
 }
 
-func (t *PoolBackupTask) Id() string {
+func (t *RbdPoolBackupTask) Id() string {
 	return t.jobConfig.Id
 }
 
-func (t *PoolBackupTask) Label() string {
+func (t *RbdPoolBackupTask) Label() string {
 	return t.jobConfig.Label
 }
 
-var _ task.PreparableTask = &PoolBackupTask{}
+var _ task.PreparableTask = &RbdPoolBackupTask{}

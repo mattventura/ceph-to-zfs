@@ -1,0 +1,178 @@
+body {
+  font-family: Tahoma, sans-serif;
+  --fg-main: #cfcfcf;
+  color: var(--fg-main);
+  --bg-main: #30364a;
+  background-color: var(--bg-main);
+  --bg-panel: #13182a;
+  font-size: large;
+  --shadow-color: #00000060;
+  --border-radius: 5px;
+  --bg-sel: #48484f;
+  --bg-hover: #3b3979;
+  --bg-active: #1b1a6c;
+  --fg-success: #0f0;
+  --fg-fail: #f00;
+  --fg-inprogress: #0f94ff;
+  --fg-notstarted: #cfcfcf80;
+  --fg-pruned: #b77d33;
+}
+button {
+  border-radius: var(--border-radius);
+  background-color: black;
+  color: #d3d3d3;
+  padding: 10px;
+  margin: 10px;
+  font-size: large;
+  border: none;
+}
+button:hover {
+  background: var(--bg-hover);
+}
+button:active {
+  background: var(--bg-active);
+}
+.shadow {
+  box-shadow: var(--shadow-color) 1px 2px 10px 2px;
+}
+.main-page {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+.main-page .toolbar {
+  background-color: var(--bg-panel);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  box-shadow: var(--shadow-color) 1px 2px 10px 2px;
+}
+.main-page .toolbar > * {
+  flex-basis: fit-content;
+  flex-grow: 0;
+  flex-shrink: 0;
+  padding-left: 10px;
+  padding-right: 20px;
+}
+.main-page .toolbar > .toolbar-mid-spacer {
+  flex-basis: 0;
+  flex-grow: 1;
+  flex-shrink: 1;
+}
+.main-page .main-table {
+  flex-basis: 1px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: row;
+  overflow-x: scroll;
+}
+.main-page .main-table .chooser,
+.main-page .main-table .detail-display {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-panel);
+  border-radius: var(--border-radius);
+  padding: 10px;
+  margin: 10px;
+  box-shadow: var(--shadow-color) 1px 2px 10px 2px;
+}
+.main-page .main-table .chooser .header-area,
+.main-page .main-table .detail-display .header-area {
+  flex-basis: 40px;
+  flex-grow: 0;
+  text-align: center;
+}
+.main-page .main-table .chooser .content-area,
+.main-page .main-table .detail-display .content-area {
+  flex-basis: 1px;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+.main-page .main-table .chooser .content-area .chooser-item,
+.main-page .main-table .detail-display .content-area .chooser-item {
+  padding-left: 5px;
+  padding-right: 5px;
+}
+.main-page .main-table .chooser .content-area .chooser-item.selected,
+.main-page .main-table .detail-display .content-area .chooser-item.selected {
+  background: var(--bg-sel);
+}
+.main-page .main-table .chooser .content-area .chooser-item:hover,
+.main-page .main-table .detail-display .content-area .chooser-item:hover {
+  background: var(--bg-hover);
+}
+.main-page .main-table .chooser .content-area .chooser-item:active,
+.main-page .main-table .detail-display .content-area .chooser-item:active {
+  background: var(--bg-active);
+}
+.main-page .main-table .chooser .content-area .chooser-item.chooser-item-bisected,
+.main-page .main-table .detail-display .content-area .chooser-item.chooser-item-bisected {
+  user-select: none;
+  display: flex;
+  flex-direction: row;
+}
+.main-page .main-table .chooser .content-area .chooser-item.chooser-item-bisected > div.left-area,
+.main-page .main-table .detail-display .content-area .chooser-item.chooser-item-bisected > div.left-area {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  flex-grow: 1;
+  flex-basis: 0;
+}
+.main-page .main-table .chooser .content-area .chooser-item.chooser-item-bisected > div.right-area,
+.main-page .main-table .detail-display .content-area .chooser-item.chooser-item-bisected > div.right-area {
+  margin-left: 5px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  flex-basis: fit-content;
+  flex-grow: 0;
+  flex-shrink: 0;
+}
+.main-page .main-table .detail-display table.job-detail-table {
+  margin-top: 20px;
+  border-spacing: 0;
+}
+.main-page .main-table .detail-display table.job-detail-table tr {
+  border-spacing: 0;
+  border: none;
+}
+.main-page .main-table .detail-display table.job-detail-table tr th {
+  background: var(--bg-panel);
+}
+.main-page .main-table .detail-display table.job-detail-table tr > td,
+.main-page .main-table .detail-display table.job-detail-table tr th {
+  text-align: left;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.main-page .main-table .detail-display table.job-detail-table tr:nth-child(odd) {
+  background: var(--bg-main);
+}
+.main-page .main-table .detail-display:last-child {
+  flex-grow: 1;
+}
+.status-label.terminal-success {
+  color: var(--fg-success);
+}
+.status-label.terminal-failed {
+  color: var(--fg-fail);
+}
+.status-label.in-progress {
+  color: var(--fg-inprogress);
+}
+.status-label.not-started {
+  color: var(--fg-notstarted);
+}
+.snapshot-absent {
+  color: var(--fg-notstarted);
+}
+.snapshot-pruned {
+  color: #b77d33;
+}
+/*# sourceMappingURL=style.css.map */

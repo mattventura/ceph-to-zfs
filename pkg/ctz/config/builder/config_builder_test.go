@@ -14,7 +14,7 @@ func TestYamlFileGood(t *testing.T) {
 	require.NoErrorf(t, err, "Error reading from yaml file")
 	jobs := cfg.Jobs
 	require.Len(t, jobs, 4)
-	assert.Equal(t, &config.PoolJobProcessedConfig{
+	assert.Equal(t, &config.RbdPoolJobProcessedConfig{
 		Id:    "Backup_VMs",
 		Label: "Backup VM Images",
 		ClusterConfig: &config.CephClusterConfig{
@@ -29,7 +29,7 @@ func TestYamlFileGood(t *testing.T) {
 		MaxConcurrency:    3,
 		Pruning:           pruning.NoPruner(),
 	}, jobs[0])
-	assert.Equal(t, &config.PoolJobProcessedConfig{
+	assert.Equal(t, &config.RbdPoolJobProcessedConfig{
 		Id:    "Backup_Templates",
 		Label: "Backup VM Images 2 this job has a very long name",
 		ClusterConfig: &config.CephClusterConfig{
@@ -44,7 +44,7 @@ func TestYamlFileGood(t *testing.T) {
 		MaxConcurrency:    config.DEFAULT_MAX_CONC,
 		Pruning:           pruning.NoPruner(),
 	}, jobs[1])
-	assert.Equal(t, &config.PoolJobProcessedConfig{
+	assert.Equal(t, &config.RbdPoolJobProcessedConfig{
 		Id:    "Empty",
 		Label: "Dummy empty job",
 		ClusterConfig: &config.CephClusterConfig{
@@ -59,7 +59,7 @@ func TestYamlFileGood(t *testing.T) {
 		MaxConcurrency:    config.DEFAULT_MAX_CONC,
 		Pruning:           pruning.NoPruner(),
 	}, jobs[2])
-	assert.Equal(t, &config.PoolJobProcessedConfig{
+	assert.Equal(t, &config.RbdPoolJobProcessedConfig{
 		Id:    "Fails",
 		Label: "Fails on purpose",
 		ClusterConfig: &config.CephClusterConfig{
