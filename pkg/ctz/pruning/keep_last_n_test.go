@@ -26,7 +26,7 @@ func TestKeepLastN(t *testing.T) {
 		"s2": []models.Snapshot{},
 	}
 
-	tcs := map[string]testCase{
+	tcs := map[string]testCase[models.Snapshot]{
 		"keep2": {
 			inputs: inputs["s1"],
 			rules: []KeepRule[models.Snapshot]{
@@ -91,7 +91,7 @@ func TestKeepLastN(t *testing.T) {
 				stubSnap{"a2", false, o(12)},
 			},
 			rules: []KeepRule[models.Snapshot]{
-				MustKeepLastN(4, "a"),
+				MustKeepLastN[models.Snapshot](4, "a"),
 			},
 			expDestroy: map[string]bool{
 				"b1": true,

@@ -2,7 +2,9 @@ package builder
 
 import (
 	"github.com/mattventura/ceph-to-zfs/pkg/ctz/config"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/models"
 	"github.com/mattventura/ceph-to-zfs/pkg/ctz/pruning"
+	"github.com/mattventura/ceph-to-zfs/pkg/ctz/zfssupport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"regexp"
@@ -27,7 +29,8 @@ func TestYamlFileGood(t *testing.T) {
 		ImageIncludeRegex: regexp.MustCompile("vm-\\d+-disk-.*"),
 		ImageExcludeRegex: nil,
 		MaxConcurrency:    3,
-		Pruning:           pruning.NoPruner(),
+		SrcPruning:        pruning.NoPruner[*models.CephSnapshot](),
+		RcvPruning:        pruning.NoPruner[*zfssupport.ZvolSnapshot](),
 	}, jobs[0])
 	assert.Equal(t, &config.RbdPoolJobProcessedConfig{
 		Id:    "Backup_Templates",
@@ -42,7 +45,8 @@ func TestYamlFileGood(t *testing.T) {
 		ImageIncludeRegex: regexp.MustCompile("base-\\d+-disk-.*"),
 		ImageExcludeRegex: nil,
 		MaxConcurrency:    config.DEFAULT_MAX_CONC,
-		Pruning:           pruning.NoPruner(),
+		SrcPruning:        pruning.NoPruner[*models.CephSnapshot](),
+		RcvPruning:        pruning.NoPruner[*zfssupport.ZvolSnapshot](),
 	}, jobs[1])
 	assert.Equal(t, &config.RbdPoolJobProcessedConfig{
 		Id:    "Empty",
@@ -57,7 +61,8 @@ func TestYamlFileGood(t *testing.T) {
 		ImageIncludeRegex: nil,
 		ImageExcludeRegex: regexp.MustCompile("nothing"),
 		MaxConcurrency:    config.DEFAULT_MAX_CONC,
-		Pruning:           pruning.NoPruner(),
+		SrcPruning:        pruning.NoPruner[*models.CephSnapshot](),
+		RcvPruning:        pruning.NoPruner[*zfssupport.ZvolSnapshot](),
 	}, jobs[2])
 	assert.Equal(t, &config.RbdPoolJobProcessedConfig{
 		Id:    "Fails",
@@ -72,7 +77,8 @@ func TestYamlFileGood(t *testing.T) {
 		ImageIncludeRegex: regexp.MustCompile("foo"),
 		ImageExcludeRegex: regexp.MustCompile("bar"),
 		MaxConcurrency:    config.DEFAULT_MAX_CONC,
-		Pruning:           pruning.NoPruner(),
+		SrcPruning:        pruning.NoPruner[*models.CephSnapshot](),
+		RcvPruning:        pruning.NoPruner[*zfssupport.ZvolSnapshot](),
 	}, jobs[3])
 
 	//assert.Equal(t, "Backup_VMs", jobs[0].Id)

@@ -13,7 +13,9 @@ cd ceph-to-zfs
 # If git did not make it executable, be sure to chmod +x it.
 ./build.sh
 # Check that it built correctly
-./ctz --help
+./ctz -help
+# It should be able to parse the sample config file
+./ctz -check-config -config ./config.sample.yaml
 ```
 
 Alternatively, if you do not wish to install git, you can use the github ZIP file instead:
